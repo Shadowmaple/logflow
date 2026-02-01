@@ -1,0 +1,40 @@
+# 遇到错误是否丢弃消息
+# global:
+#   discard_on_error: true
+
+input:
+  - kafka:
+      brokers: []
+      version: "2.8.2"
+      topics: ["logflow"]
+      group_id: logflow-group
+      worker: 1
+      # auto_offset_reset: latest
+      from_beginning: true
+      # enable_auto_commit: true
+      auto_commit_interval: 30000 # ms
+      sasl_enable: false
+      decorate_events: true
+      codec: "plain"
+      messages_queue_length: 8
+      client_id: logflow-client
+      sasl_mechanism: SCRAM-SHA-256
+      sasl_username: ""
+      sasl_password: ""
+      discard_on_error: false # 遇到错误是否丢弃消息
+
+filter:
+  - json:
+      source: message
+
+output:
+  - elasticsearch:
+      hosts: ["https://10.20.51.44:11001","https://10.20.51.45:11001","https://10.20.51.46:11001"]
+      index: "kafka-%{[@metadata][kafka][topic]}-%{localtime}"
+      user: elastic
+      password: test
+      ssl: true
+      cacert: '/data/apps/elasticsearch-ca.pem'
+      sniff: false
+      sniff_interval: 30 # 秒
+      version: 7
