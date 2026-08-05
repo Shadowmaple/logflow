@@ -10,7 +10,7 @@ import (
 )
 
 type Config struct {
-	Worker int              `yaml:"worker"` // 处理线程数
+	Worker int              `yaml:"worker"` // 并发处理数，即每个input开启n个任务协程并发处理，每个input都有单独的filter和output队列
 	Logger map[string]any   `yaml:"logger"`
 	Input  []map[string]any `yaml:"input"`
 	Filter []map[string]any `yaml:"filter"`

@@ -29,14 +29,15 @@ func buildInputHandler(config *config.Config, idx int) *InputHandler {
 	}
 }
 
-// Start 启动所有处理线程
+// Start 启动所有处理任务
 func (h *InputHandler) start() {
 	for i := 0; i < h.config.Worker; i++ {
-		h.startOne(i)
+		go h.startOne(i)
 	}
 }
 
-// StartOne 启动一个处理线程
+// StartOne 启动一个处理任务
+// 执行不退出，不断从 input 接收事件，经过 filter 处理后发送到 output
 func (h *InputHandler) startOne(id int) {
 	// build filter, output processors
 	filters := BuildFilterProcessors(h.config.Filter)

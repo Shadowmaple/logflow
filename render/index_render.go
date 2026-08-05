@@ -1,7 +1,9 @@
 package render
 
 import (
+	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/Shadowmaple/logflow/internal/model"
 )
@@ -9,16 +11,24 @@ import (
 type field struct {
 	literal bool // 是否为字面量，即不需要赋值
 	value   string
+	mu      *MultiLevelRender // 多层级解析器，如[@metadata][kafka][topic]
 }
 
-func (f *field) render(data map[string]any) string {
+func (f *field) render(event *model.Event) (string, error) {
 	if f.literal {
-		return f.value
+		return f.value, nil
 	}
-	if val, ok := data[f.value]; ok {
-		return val.(string)
+	if f.mu != nil {
+		val, err := f.mu.Render(event)
+		if err != nil {
+			return "", err
+		}
+		return val.(string), nil
 	}
-	return ""
+	if val, ok := event.Data[f.value]; ok {
+		return val.(string), nil
+	}
+	return "", fmt.Errorf("index render failed, %s not found", f.value)
 }
 
 func newIndexRender(template string) *IndexRender {
@@ -34,10 +44,19 @@ func newIndexRender(template string) *IndexRender {
 		})
 		// 需赋值的字段
 		// TODO: 多级嵌套的字段，如[@metadata][kafka][topic]
-		fields = append(fields, &field{
-			literal: false,
-			value:   template[l+2 : r-1],
-		})
+		val := template[l+2 : r-1]
+		if strings.HasPrefix(val, "[") && strings.HasSuffix(val, "]") {
+			fields = append(fields, &field{
+				literal: false,
+				value:   val,
+				mu:      newMultiLevelRender(val),
+			})
+		} else {
+			fields = append(fields, &field{
+				literal: false,
+				value:   val,
+			})
+		}
 		lastIdx = r
 	}
 	if lastIdx < len(template) {
@@ -54,10 +73,13 @@ type IndexRender struct {
 }
 
 func (r *IndexRender) Render(event *model.Event) (any, error) {
-	data := event.Data
-	result := ""
+	values := make([]string, 0, len(r.fields))
 	for _, f := range r.fields {
-		result += f.render(data)
+		val, err := f.render(event)
+		if err != nil {
+			return "", err
+		}
+		values = append(values, val)
 	}
-	return result, nil
+	return strings.Join(values, ""), nil
 }
