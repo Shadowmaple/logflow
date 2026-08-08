@@ -5,8 +5,8 @@
 input:
   - kafka:
       brokers: []
-      version: "2.8.2"
-      topics: ["logflow"]
+      version: '2.8.2'
+      topics: ['logflow']
       group_id: logflow-group
       worker: 1
       # auto_offset_reset: latest
@@ -15,22 +15,29 @@ input:
       auto_commit_interval: 30000 # ms
       sasl_enable: false
       decorate_events: true
-      codec: "plain"
+      codec: 'plain'
       messages_queue_length: 8
       client_id: logflow-client
       sasl_mechanism: SCRAM-SHA-256
-      sasl_username: ""
-      sasl_password: ""
+      sasl_username: ''
+      sasl_password: ''
       discard_on_error: false # 遇到错误是否丢弃消息
 
 filter:
   - json:
       source: message
+  - date:
+      location: 'Asia/Shanghai'
+      source: datatime
+      format: 'yyyy-MM-dd HH:mm:ss.SSS'
+      target: datatime
+  - drop:
+    - if: ['EQ(level, "DEBUG")']
 
 output:
   - elasticsearch:
-      hosts: ["https://10.20.51.44:11001","https://10.20.51.45:11001","https://10.20.51.46:11001"]
-      index: "kafka-%{[@metadata][kafka][topic]}-%{localtime}"
+      hosts: ['https://10.20.51.44:11001','https://10.20.51.45:11001','https://10.20.51.46:11001']
+      index: 'kafka-%{[@metadata][kafka][topic]}-%{@localtime}'
       user: elastic
       password: test
       ssl: true
