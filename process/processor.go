@@ -29,7 +29,7 @@ func (pn *ProcessNode) Process(event *model.Event) {
 		logger.Error("process event failed", zap.String("event", event.String()))
 		return
 	}
-	if pn.next != nil {
+	if event != nil && pn.next != nil {
 		pn.next.Process(event)
 	}
 }

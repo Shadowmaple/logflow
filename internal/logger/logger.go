@@ -8,6 +8,13 @@ import (
 
 var Logger *zap.Logger
 
+func getLogger() *zap.Logger {
+	if Logger != nil {
+		return Logger
+	}
+	return zap.NewExample()
+}
+
 type LoggerConfig struct {
 	Level string
 }
@@ -42,27 +49,27 @@ func Init(cf map[string]any) {
 }
 
 func Sync() {
-	Logger.Sync()
+	getLogger().Sync()
 }
 
 func Debug(msg string, fields ...zap.Field) {
-	Logger.Info(msg, fields...)
+	getLogger().Info(msg, fields...)
 }
 
 func Info(msg string, fields ...zap.Field) {
-	Logger.Info(msg, fields...)
+	getLogger().Info(msg, fields...)
 }
 
 func Warn(msg string, fields ...zap.Field) {
-	Logger.Info(msg, fields...)
+	getLogger().Info(msg, fields...)
 }
 
 func Error(msg string, fields ...zap.Field) {
-	Logger.Info(msg, fields...)
+	getLogger().Info(msg, fields...)
 }
 
 func Fatal(msg string, fields ...zap.Field) {
-	Logger.Fatal(msg, fields...)
+	getLogger().Fatal(msg, fields...)
 }
 
 // func Infof(format string, args ...interface{}) {
