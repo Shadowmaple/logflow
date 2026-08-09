@@ -4,6 +4,24 @@
 
 ## 字段约定
 
+### JSONPATH 格式
+
+如果以 `$.` 开头, 认为是这种格式
+
+给几个下面文中的例子
+
+```text
+$.store.book[0].title
+
+$['store']['book'][0]['title']
+
+$.store.book[(@.length-1)].title
+
+$.store.book[?(@.price < 10)].title
+```
+
+具体的格式和例子参见 [https://goessner.net/articles/JsonPath/](https://goessner.net/articles/JsonPath/)
+
 ## 配置规则
 
 ### input
@@ -104,6 +122,49 @@ exclude 中的字段不要。优先级低于 include
 
 如果源字段不存在, 返回 false. 如果所有 formats 都匹配失败, 返回 false
 
+```YAML
+date:
+  src: 'logtime'
+  target: '@timestamp'
+  location: 'Asia/Shanghai'
+  add_year: false
+  overwrite: true
+  formats:
+      - 'RFC3339'
+      - '2006-01-02T15:04:05'
+      - '2006-01-02T15:04:05Z07:00'
+      - '2006-01-02T15:04:05Z0700'
+      - '2006-01-02'
+      - 'UNIX'
+      - 'UNIX_MS'
+```
+
+#### dateFormat
+
+将 `time`类型的字段格式化到另一个字段中
+
+```YAML
+dateFormat:
+  source: datatime
+  location: 'Asia/Shanghai'
+  format: '2006.01.02'
+  target: "@localtime"
+  set_if_fail: '1970.01.01'
+  set_if_nil: '1970.01.01'
+```
+
+##### remove_if_fail
+
+如果转换失败刚删除这个字段, 默认 false
+
+##### set_if_fail: XX
+
+如果转换失败, 刚将此字段的值设置为 XX . 优先级比 remove_if_fail 低.  如果 remove_if_fail 设置为 true, 则 set_if_fail 无效.
+
+##### set_if_nil: XX
+
+如果没有这个字段, 刚将此字段的值设置为 XX . 优先级最高
+
 #### drop
 
 满足条件则抛弃消息
@@ -116,17 +177,18 @@ drop:
 #### lowercase
 
 ```YAML
-lowercase: ['domain', 'url']
+lowercase:
+  fields: ['domain', 'url']
 ```
 
-#### Remove
+#### remove
 
 ```YAML
 Remove:
   fields: ['domain', 'url']
 ```
 
-#### Rename
+#### rename
 
 ```YAML
 Rename:

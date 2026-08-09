@@ -1,59 +1,65 @@
 package process
 
-import (
-	commonFilter "github.com/Shadowmaple/logflow/common_filter"
-	"github.com/Shadowmaple/logflow/filter"
-	"github.com/Shadowmaple/logflow/internal/logger"
-	"github.com/Shadowmaple/logflow/internal/model"
+// type FilterProcessor struct {
+// 	model.Filter
 
-	"go.uber.org/zap"
-)
+// 	condition *condition.ConditionFilter
+// 	config    map[string]any
+// 	failTag   string
+// 	addFields map[field.FieldSetter]any
+// 	// removeFields []field_deleter.FieldDeleter
+// }
 
-type FilterProcessor struct {
-	filter.Filter
+// type buildFilterFunc func(config map[string]any) model.Filter
 
-	condition *commonFilter.ConditionFilter
-	config    map[string]any
-	failTag   string
-	// removeFields []field_deleter.FieldDeleter
-	// addFields    map[field_setter.FieldSetter]value_render.ValueRender
-}
+// func buildFilterProcessor(conf map[string]any, buildFilterFunc buildFilterFunc) *FilterProcessor {
+// 	filter := buildFilterFunc(conf)
+// 	if filter == nil {
+// 		logger.Fatal("filter processor build failed", zap.Any("config", conf))
+// 		return nil
+// 	}
+// 	p := &FilterProcessor{
+// 		Filter: filter,
+// 		config: conf,
+// 	}
+// 	for _, v := range conf {
+// 		vConf := v.(map[string]any)
+// 		p.condition = condition.NewConditionFilter(vConf)
+// 		if failTag, ok := vConf["fail_tag"]; ok {
+// 			p.failTag = failTag.(string)
+// 		}
+// 		if addFields, ok := vConf["add_fields"]; ok {
+// 			// p.addFields = make(map[field.FieldSetter]render.Render)
+// 			for k, v := range addFields.(map[string]any) {
+// 				p.addFields[field.NewFieldSetter(k, false)] = v
+// 			}
+// 		}
+// 	}
+// 	return p
+// }
 
-func buildFilterProcessor(conf map[string]any) *FilterProcessor {
-	filter := filter.BuildFilter(conf)
-	if filter == nil {
-		return nil
-	}
-	p := &FilterProcessor{
-		Filter: filter,
-		config: conf,
-	}
-	for _, v := range conf {
-		vConf := v.(map[string]any)
-		p.condition = commonFilter.NewConditionFilter(vConf)
-		if failTag, ok := vConf["fail_tag"]; ok {
-			p.failTag = failTag.(string)
-		}
-	}
-	return p
-}
+// func BuildFilterProcessors(confs []map[string]any, buildFilterFunc buildFilterFunc) []*FilterProcessor {
+// 	res := make([]*FilterProcessor, len(confs))
+// 	for i, conf := range confs {
+// 		res[i] = buildFilterProcessor(conf, buildFilterFunc)
+// 	}
+// 	return res
+// }
 
-func BuildFilterProcessors(confs []map[string]any) []*FilterProcessor {
-	filters := filter.BuildFilters(confs)
-	res := make([]*FilterProcessor, len(filters))
-	for i, f := range filters {
-		res[i] = buildFilterProcessor(confs[i])
-		res[i].Filter = f
-	}
-	return res
-}
-
-func (f *FilterProcessor) Process(event *model.Event) bool {
-	if f.condition.Check(event) {
-		if err := f.Filter.Filter(event); err != nil {
-			logger.Error("filter process event failed", zap.Error(err))
-			return false
-		}
-	}
-	return true
-}
+// func (f *FilterProcessor) Process(event *event.Event) bool {
+// 	if event != nil && f.condition.Check(event) {
+// 		if err := f.Filter.Filter(event); err != nil {
+// 			logger.Error("filter process event failed", zap.Error(err))
+// 			if f.failTag != "" {
+// 				event.Data["fail_tag"] = f.failTag
+// 			}
+// 			return false
+// 		}
+// 		if f.addFields != nil {
+// 			for k, v := range f.addFields {
+// 				k.SetField(event, v)
+// 			}
+// 		}
+// 	}
+// 	return true
+// }

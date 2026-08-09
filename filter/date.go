@@ -9,7 +9,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Shadowmaple/logflow/internal/model"
+	"github.com/Shadowmaple/logflow/internal/event"
+	"github.com/Shadowmaple/logflow/internal/utils"
+	"github.com/Shadowmaple/logflow/model"
+
 	"github.com/relvacode/iso8601"
 )
 
@@ -174,7 +177,7 @@ func init() {
 	register("Date", newDateFilter)
 }
 
-func newDateFilter(config map[string]any) Filter {
+func newDateFilter(config map[string]any) model.Filter {
 	plugin := &DateFilter{
 		config:      config,
 		dateParsers: make([]DateParser, 0),
@@ -187,14 +190,14 @@ func newDateFilter(config map[string]any) Filter {
 	dateConfig.Overwrite = true
 	dateConfig.AddYear = false
 
-	SafeDecodeConfig("Date", config, &dateConfig)
+	utils.SafeDecodeConfig("date", config, &dateConfig)
 
 	// Validate required fields
 	if dateConfig.Src == "" {
-		panic("Date filter: 'src' is required")
+		panic("date filter: 'src' is required")
 	}
 	if len(dateConfig.Formats) == 0 {
-		panic("Date filter: 'formats' is required and cannot be empty")
+		panic("date filter: 'formats' is required and cannot be empty")
 	}
 
 	plugin.overwrite = dateConfig.Overwrite
@@ -221,7 +224,7 @@ func newDateFilter(config map[string]any) Filter {
 	return plugin
 }
 
-func (plugin *DateFilter) Filter(event *model.Event) error {
+func (f *DateFilter) Filter(event *event.Event) error {
 	// inputI, err := plugin.srcVR.Render(event)
 	// if err != nil || inputI == nil {
 	// 	return nil

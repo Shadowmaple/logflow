@@ -1,16 +1,8 @@
 package input
 
-import (
-	"github.com/Shadowmaple/logflow/internal/model"
-)
+import "github.com/Shadowmaple/logflow/model"
 
-type Input interface {
-	// Receive() <-chan *model.Event
-	ReceiveOne() *model.Event
-	Close()
-}
-
-func NewInput(conf map[string]any) Input {
+func NewInput(conf map[string]any) model.Input {
 	if conf == nil {
 		panic("input config is nil")
 	}

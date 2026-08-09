@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Shadowmaple/logflow/internal/model"
+	"github.com/Shadowmaple/logflow/internal/event"
 )
 
 type field struct {
@@ -14,7 +14,7 @@ type field struct {
 	mu      *MultiLevelRender // 多层级解析器，如[@metadata][kafka][topic]
 }
 
-func (f *field) render(event *model.Event) (string, error) {
+func (f *field) render(event *event.Event) (string, error) {
 	if f.literal {
 		return f.value, nil
 	}
@@ -49,7 +49,7 @@ func newIndexRender(template string) *IndexRender {
 			fields = append(fields, &field{
 				literal: false,
 				value:   val,
-				mu:      newMultiLevelRender(val),
+				mu:      newMultiLevelRender(getAllFields(val)),
 			})
 		} else {
 			fields = append(fields, &field{
@@ -68,11 +68,21 @@ func newIndexRender(template string) *IndexRender {
 	return &IndexRender{fields: fields}
 }
 
+// getAllFields ("%{[@metadata][kafka][topic]}") => ["@metadata","kafka","topic"]
+func getAllFields(s string) []string {
+	fields := make([]string, 0)
+	r, _ := regexp.Compile(`\[(.*?)\]`)
+	for _, v := range r.FindAll([]byte(s), -1) {
+		fields = append(fields, string(v[1:len(v)-1]))
+	}
+	return fields
+}
+
 type IndexRender struct {
 	fields []*field
 }
 
-func (r *IndexRender) Render(event *model.Event) (any, error) {
+func (r *IndexRender) Render(event *event.Event) (any, error) {
 	values := make([]string, 0, len(r.fields))
 	for _, f := range r.fields {
 		val, err := f.render(event)

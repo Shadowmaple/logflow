@@ -1,13 +1,13 @@
-package commonFilter
+package condition
 
 import (
 	"testing"
 
-	"github.com/Shadowmaple/logflow/internal/model"
+	"github.com/Shadowmaple/logflow/internal/event"
 )
 
 func TestConditionFilterCheck(t *testing.T) {
-	event := &model.Event{Data: map[string]any{
+	event := &event.Event{Data: map[string]any{
 		"level": "DEBUG",
 		"msg":   "hello",
 		"tag":   "backup",
@@ -33,7 +33,7 @@ func TestConditionFilterCheck(t *testing.T) {
 }
 
 func TestConditionFilterCheckWithAndAndNotIn(t *testing.T) {
-	event := &model.Event{Data: map[string]any{
+	event := &event.Event{Data: map[string]any{
 		"level": "INFO",
 		"items": []any{"test", 2},
 	}}
@@ -62,7 +62,7 @@ func TestConditionFilterCheckWithAndAndNotIn(t *testing.T) {
 }
 
 func TestConditionFilterCheckWithNil(t *testing.T) {
-	event := &model.Event{Data: map[string]any{
+	event := &event.Event{Data: map[string]any{
 		"value": nil,
 	}}
 
@@ -78,7 +78,7 @@ func TestConditionFilterCheckWithNil(t *testing.T) {
 }
 
 func TestConditionFilterCheckWithMixedAndOr(t *testing.T) {
-	event := &model.Event{Data: map[string]any{
+	event := &event.Event{Data: map[string]any{
 		"level": "INFO",
 		"msg":   "hello",
 	}}

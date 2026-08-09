@@ -5,9 +5,10 @@ import (
 	"errors"
 	"maps"
 
+	"github.com/Shadowmaple/logflow/internal/event"
 	"github.com/Shadowmaple/logflow/internal/logger"
-	"github.com/Shadowmaple/logflow/internal/model"
 	"github.com/Shadowmaple/logflow/internal/utils"
+	"github.com/Shadowmaple/logflow/model"
 
 	"go.uber.org/zap"
 )
@@ -17,7 +18,7 @@ type JsonFilter struct {
 	Target string
 }
 
-func (jf *JsonFilter) Filter(event *model.Event) (err error) {
+func (jf *JsonFilter) Filter(event *event.Event) (err error) {
 	// 从source解析json，并将结果存储到target
 	raw, ok := event.Data[jf.Source]
 	if !ok {
@@ -46,7 +47,7 @@ func (jf *JsonFilter) Filter(event *model.Event) (err error) {
 	return nil
 }
 
-func NewJsonFilter(conf map[string]any) Filter {
+func newJsonFilter(conf map[string]any) model.Filter {
 	f := &JsonFilter{
 		Target: "",
 	}
@@ -62,5 +63,5 @@ func NewJsonFilter(conf map[string]any) Filter {
 }
 
 func init() {
-	register("json", NewJsonFilter)
+	register("json", newJsonFilter)
 }
