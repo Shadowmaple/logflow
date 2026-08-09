@@ -2,20 +2,20 @@ package filter
 
 import (
 	"github.com/Shadowmaple/logflow/internal/logger"
-	"github.com/Shadowmaple/logflow/internal/model"
+	"github.com/Shadowmaple/logflow/model"
 
 	"go.uber.org/zap"
 )
 
-type Filter interface {
-	Filter(event *model.Event) error
-}
+// type Filter interface {
+// 	Filter(event *event.Event) error
+// }
 
-func BuildFilters(conf []map[string]any) []Filter {
+func BuildFilters(conf []map[string]any) []model.Filter {
 	if conf == nil {
 		return nil
 	}
-	filters := make([]Filter, 0, len(conf))
+	filters := make([]model.Filter, 0, len(conf))
 	for _, c := range conf {
 		f := BuildFilter(c)
 		if f != nil {
@@ -25,7 +25,7 @@ func BuildFilters(conf []map[string]any) []Filter {
 	return filters
 }
 
-func BuildFilter(conf map[string]any) Filter {
+func BuildFilter(conf map[string]any) model.Filter {
 	if conf == nil {
 		return nil
 	}
@@ -40,8 +40,8 @@ func BuildFilter(conf map[string]any) Filter {
 	return nil
 }
 
-var filterHandlers = make(map[string]func(conf map[string]any) Filter)
+var filterHandlers = make(map[string]func(conf map[string]any) model.Filter)
 
-func register(name string, f func(conf map[string]any) Filter) {
+func register(name string, f func(conf map[string]any) model.Filter) {
 	filterHandlers[name] = f
 }

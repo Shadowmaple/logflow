@@ -26,13 +26,26 @@ input:
 filter:
   - json:
       source: message
+  - filters:
+      if: ['Exist(level)']
+      filters:
+        - strip: ['level']
+        - uppercase: ['level']
+        - drop:
+            if: ['EQ(level, "DEBUG")']
   - date:
       location: 'Asia/Shanghai'
       source: datatime
       format: 'yyyy-MM-dd HH:mm:ss.SSS'
       target: datatime
-  - drop:
-    - if: ['EQ(level, "DEBUG")']
+  - dateFormat:
+      source: datatime
+      location: 'Asia/Shanghai'
+      format: 'yyyy.MM.dd'
+      target: "@localtime"
+      set_if_fail: '1970.01.01'
+      set_if_nil: '1970.01.01'
+  - lowercase: [ "[@metadata][kafka][topic]" ]
 
 output:
   - elasticsearch:

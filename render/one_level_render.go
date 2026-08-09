@@ -3,7 +3,7 @@ package render
 import (
 	"fmt"
 
-	"github.com/Shadowmaple/logflow/internal/model"
+	"github.com/Shadowmaple/logflow/internal/event"
 )
 
 type OneLevelRender struct {
@@ -15,7 +15,7 @@ func newOneLevelRender(s string) *OneLevelRender {
 }
 
 // Render 解析事件数据，返回解析后的值
-func (r *OneLevelRender) Render(event *model.Event) (any, error) {
+func (r *OneLevelRender) Render(event *event.Event) (any, error) {
 	if val, ok := event.Data[r.field]; ok {
 		return val, nil
 	}

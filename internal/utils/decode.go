@@ -1,4 +1,4 @@
-package filter
+package utils
 
 import (
 	"encoding/json"
@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// ConvertToJSONCompatible recursively converts map[string]any to map[string]any for JSON compatibility
-func ConvertToJSONCompatible(input any) any {
-	switch v := input.(type) {
+// 递归将 map[string]any 类型转换为 json 形式的 map[string]any
+func ConvertToJSONCompatible(conf any) any {
+	switch v := conf.(type) {
 	case map[any]any:
 		result := make(map[string]any)
 		for k, val := range v {
@@ -17,6 +17,12 @@ func ConvertToJSONCompatible(input any) any {
 			} else {
 				panic(fmt.Sprintf("config key '%v' is not a string", k))
 			}
+		}
+		return result
+	case map[string]any:
+		result := make(map[string]any)
+		for k, val := range v {
+			result[k] = ConvertToJSONCompatible(val)
 		}
 		return result
 	case []any:
@@ -30,16 +36,15 @@ func ConvertToJSONCompatible(input any) any {
 	}
 }
 
-// SafeDecodeConfig safely decodes filter configuration using encoding/json
-// This provides detailed error messages from the standard library
-func SafeDecodeConfig(filterType string, config map[string]any, result any) {
+// 将配置文件通过 json 标准库解析到 result 中
+func SafeDecodeConfig(kind string, config map[string]any, result any) {
 	// Convert config to JSON-serializable format
 	jsonConfig := ConvertToJSONCompatible(config)
 
 	// Convert map to JSON and then unmarshal to struct
 	jsonBytes, err := json.Marshal(jsonConfig)
 	if err != nil {
-		panic(fmt.Sprintf("%s filter: failed to marshal config to JSON: %v", filterType, err))
+		panic(fmt.Sprintf("%s type: failed to marshal config to JSON: %v", kind, err))
 	}
 
 	// Use a decoder with UseNumber to preserve number precision and allow type flexibility
@@ -47,15 +52,15 @@ func SafeDecodeConfig(filterType string, config map[string]any, result any) {
 	decoder.UseNumber()
 
 	if err := decoder.Decode(result); err != nil {
-		panic(fmt.Sprintf("%s filter configuration error: %v", filterType, err))
+		panic(fmt.Sprintf("%s type configuration error: %v", kind, err))
 	}
 }
 
-// ValidateRequiredFields checks that required fields are present in the decoded config
-func ValidateRequiredFields(filterType string, fields map[string]any) {
+// 校验配置文件中是否缺少必填字段
+func ValidateRequiredFields(kind string, fields map[string]any) {
 	for fieldName, fieldValue := range fields {
 		if fieldValue == nil || (fmt.Sprintf("%v", fieldValue) == "") {
-			panic(fmt.Sprintf("%s filter: '%s' is required", filterType, fieldName))
+			panic(fmt.Sprintf("%s type: '%s' is required", kind, fieldName))
 		}
 	}
 }

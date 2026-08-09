@@ -1,10 +1,10 @@
-package commonFilter
+package condition
 
 import (
 	"reflect"
 
+	"github.com/Shadowmaple/logflow/internal/event"
 	"github.com/Shadowmaple/logflow/internal/logger"
-	"github.com/Shadowmaple/logflow/internal/model"
 
 	"go.uber.org/zap"
 )
@@ -69,7 +69,7 @@ func NewConditionFilter(conf map[string]any) *ConditionFilter {
 }
 
 // 是否通过判断条件
-func (c *ConditionFilter) Check(event *model.Event) bool {
+func (c *ConditionFilter) Check(event *event.Event) bool {
 	if c == nil || len(c.conditions) == 0 {
 		return true
 	}

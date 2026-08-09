@@ -3,14 +3,16 @@ package process
 import (
 	"sync"
 
+	"github.com/Shadowmaple/logflow/filter"
 	"github.com/Shadowmaple/logflow/input"
 	"github.com/Shadowmaple/logflow/internal/config"
 	"github.com/Shadowmaple/logflow/internal/logger"
+	"github.com/Shadowmaple/logflow/model"
 )
 
 type InputHandler struct {
 	config  *config.Config
-	input   input.Input
+	input   model.Input
 	outputs [][]*OutputProcessor
 
 	stop bool
@@ -40,7 +42,7 @@ func (h *InputHandler) start() {
 // 执行不退出，不断从 input 接收事件，经过 filter 处理后发送到 output
 func (h *InputHandler) startOne(id int) {
 	// build filter, output processors
-	filters := BuildFilterProcessors(h.config.Filter)
+	filters := model.BuildFilterProcessors(h.config.Filter, filter.BuildFilter)
 	outputs := BuildOutputProcessors(h.config.Output)
 	if len(outputs) == 0 {
 		logger.Fatal("no valid output built")
@@ -48,7 +50,7 @@ func (h *InputHandler) startOne(id int) {
 	}
 	h.outputs[id] = outputs
 
-	processor := NewProcessList()
+	processor := model.NewProcessList()
 	for _, filter := range filters {
 		processor.Append(filter)
 	}

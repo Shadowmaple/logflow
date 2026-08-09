@@ -1,6 +1,6 @@
 module github.com/Shadowmaple/logflow
 
-go 1.24.0
+go 1.25.5
 
 require (
 	github.com/IBM/sarama v1.46.0
@@ -23,6 +23,7 @@ require (
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/oliveagle/jsonpath v0.1.4 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	github.com/rogpeppe/go-internal v1.6.1 // indirect

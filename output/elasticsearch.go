@@ -6,9 +6,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/Shadowmaple/logflow/internal/event"
 	"github.com/Shadowmaple/logflow/internal/logger"
-	"github.com/Shadowmaple/logflow/internal/model"
 	"github.com/Shadowmaple/logflow/internal/utils"
+	"github.com/Shadowmaple/logflow/model"
+
 	"github.com/elastic/go-elasticsearch/v7"
 	"go.uber.org/zap"
 )
@@ -30,7 +32,7 @@ type ElasticsearchOutput struct {
 	client *elasticsearch.Client
 }
 
-func newElasticsearchOutput(config map[string]any) Output {
+func newElasticsearchOutput(config map[string]any) model.Output {
 	if config == nil {
 		logger.Fatal("Elasticsearch config is nil")
 	}
@@ -143,7 +145,7 @@ func newElasticsearchOutput(config map[string]any) Output {
 	return e
 }
 
-func (e *ElasticsearchOutput) Handle(event *model.Event) error {
+func (e *ElasticsearchOutput) Handle(event *event.Event) error {
 
 	// TODO: 根据index格式和消息，生成需写入的index
 	index := ""

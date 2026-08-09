@@ -1,14 +1,16 @@
 package process
 
 import (
+	"github.com/Shadowmaple/logflow/internal/event"
 	"github.com/Shadowmaple/logflow/internal/logger"
-	"github.com/Shadowmaple/logflow/internal/model"
+	"github.com/Shadowmaple/logflow/model"
 	"github.com/Shadowmaple/logflow/output"
+
 	"go.uber.org/zap"
 )
 
 type OutputProcessor struct {
-	output.Output
+	model.Output
 }
 
 func BuildOutputProcessors(confs []map[string]any) []*OutputProcessor {
@@ -20,7 +22,7 @@ func BuildOutputProcessors(confs []map[string]any) []*OutputProcessor {
 	return l
 }
 
-func (o *OutputProcessor) Process(event *model.Event) bool {
+func (o *OutputProcessor) Process(event *event.Event) bool {
 	if err := o.Output.Handle(event); err != nil {
 		logger.Error("output process event failed", zap.Error(err))
 		return false

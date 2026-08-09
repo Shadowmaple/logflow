@@ -134,7 +134,7 @@ func (ig InputGroup) Close() {
 // 	// // 快速消费channel中未处理的event
 // 	// for event := range input.Receive() {
 // 	// 	wg.Add(1)
-// 	// 	go func(event model.Event) {
+// 	// 	go func(event event.Event) {
 // 	// 		defer wg.Done()
 // 	// 		processor.Process(&event)
 // 	// 	}(*event)
@@ -188,7 +188,7 @@ func (ig InputGroup) Close() {
 // 	// 快速消费channel中未处理的event
 // 	for event := range input.Receive() {
 // 		wg.Add(1)
-// 		go func(event model.Event) {
+// 		go func(event event.Event) {
 // 			defer wg.Done()
 // 			processor.Process(&event)
 // 		}(*event)

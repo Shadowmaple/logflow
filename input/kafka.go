@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/Shadowmaple/logflow/codec"
+	"github.com/Shadowmaple/logflow/internal/event"
 	"github.com/Shadowmaple/logflow/internal/logger"
-	"github.com/Shadowmaple/logflow/internal/model"
 	"github.com/Shadowmaple/logflow/internal/utils"
+	"github.com/Shadowmaple/logflow/model"
 
 	"github.com/IBM/sarama"
 	"go.uber.org/zap"
@@ -33,7 +34,7 @@ type KafkaInput struct {
 	decorateEvents bool
 	discardOnError bool // 遇到错误是否丢弃消息
 
-	ch       chan *model.Event
+	ch       chan *event.Event
 	messages chan *sarama.ConsumerMessage
 	stop     bool
 
@@ -184,14 +185,14 @@ func newKafkaInputConfig(conf map[string]any) *KafkaInputConfig {
 	return c
 }
 
-func newKafkaInput(conf map[string]any) Input {
+func newKafkaInput(conf map[string]any) model.Input {
 	// 解析config
 	config := newKafkaInputConfig(conf)
 	kafkaInput := &KafkaInput{
 		config:         conf,
 		decorateEvents: config.decorateEvents,
 		discardOnError: config.discardOnError,
-		ch:             make(chan *model.Event, config.messagesQueueLength),
+		ch:             make(chan *event.Event, config.messagesQueueLength),
 		messages:       make(chan *sarama.ConsumerMessage, config.messagesQueueLength),
 		groupConsumers: make([]*sarama.ConsumerGroup, config.worker),
 		decoder:        codec.NewDecoder(config.codec),
@@ -242,12 +243,12 @@ func newKafkaInput(conf map[string]any) Input {
 }
 
 // receive events
-func (ki *KafkaInput) Receive() <-chan *model.Event {
+func (ki *KafkaInput) Receive() <-chan *event.Event {
 	return ki.ch
 }
 
 // receive events
-func (ki *KafkaInput) ReceiveOne() *model.Event {
+func (ki *KafkaInput) ReceiveOne() *event.Event {
 	if ki.stop {
 		return nil
 	}
@@ -291,7 +292,7 @@ func (ki *KafkaInput) ReceiveOne() *model.Event {
 			}
 			data["@metadata"] = map[string]any{"kafka": kafkaMeta}
 		}
-		return &model.Event{
+		return &event.Event{
 			Data: data,
 			Time: time.Now(),
 		}
@@ -368,7 +369,7 @@ func (k *KafkaInput) ConsumeClaim(session sarama.ConsumerGroupSession, claim sar
 		// 	// event["@metadata"] = map[string]any{"kafka": kafkaMeta}
 		// }
 
-		// k.ch <- &model.Event{
+		// k.ch <- &event.Event{
 		// 	Data: data,
 		// 	Time: time.Now(),
 		// }

@@ -1,4 +1,4 @@
-package commonFilter
+package condition
 
 import (
 	"fmt"
