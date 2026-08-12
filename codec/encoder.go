@@ -8,6 +8,8 @@ func NewEncoder(codeType string) Encoder {
 	switch codeType {
 	case "json":
 		return &JsonEncoder{}
+	case "plain":
+		return &PlainEncoder{}
 	}
-	return nil
+	panic("invalid codec type: " + codeType)
 }

@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -68,7 +69,7 @@ func newDateFormatFilter(config map[string]any) model.Filter {
 	f.removeIfFail = dateFormatConfig.RemoveIfFail
 	f.overwrite = dateFormatConfig.Overwrite
 
-	// Convert Java-style format (yyyy-MM-dd) to Go-style format (2006-01-02)
+	// Convert common format (yyyy-MM-dd) to Go-style format (2006-01-02)
 	f.format = utils.ConvertToGoFormat(dateFormatConfig.Format)
 	if f.format == "" {
 		panic("dateFormat filter: invalid format")
@@ -82,25 +83,24 @@ func newDateFormatFilter(config map[string]any) model.Filter {
 			panic(fmt.Sprintf("dateFormat filter: load location error: %s", err))
 		}
 	}
-
 	return f
 }
 
-func (f *DateFormatFilter) Filter(event *event.Event) error {
+func (f *DateFormatFilter) Filter(event *event.Event) (*event.Event, error) {
 	// Priority 1: set_if_nil - if source field does not exist
 	sourceVal, sourceExists := event.Data[f.source]
 	if !sourceExists {
 		if f.setIfNil != "" {
 			f.setTargetValue(event, f.setIfNil)
 		}
-		return nil
+		return event, errors.New("dateFormat filter failed: source field not found")
 	}
 
 	// Source exists, try to get time.Time value
 	t, ok := f.extractTime(sourceVal)
 	if !ok {
 		f.handleFailure(event)
-		return nil
+		return event, errors.New("dateFormat filter failed: source field is not of type time.Time or *time.Time")
 	}
 
 	// Apply location if configured
@@ -114,7 +114,7 @@ func (f *DateFormatFilter) Filter(event *event.Event) error {
 	// Write to target
 	f.setTargetValue(event, formatted)
 
-	return nil
+	return event, nil
 }
 
 // extractTime tries to extract a time.Time from the given value

@@ -13,7 +13,7 @@ func ValidateKeyExists(m map[string]any, keys []string) bool {
 	return true
 }
 
-// 将 java/python 等时间格式化格式转为 Go 格式化格式
+// 将标准时间格式化格式转为 Go 时间格式化格式
 // Supported tokens:
 // yyyy -> 2006  (4-digit year)
 // yy   -> 06    (2-digit year)
@@ -39,6 +39,13 @@ func ValidateKeyExists(m map[string]any, keys []string) bool {
 // XX   -> -0700 (time zone offset ISO8601 hour+minute)
 // XXX  -> -07:00 (time zone offset ISO8601 with colon)
 func ConvertToGoFormat(format string) string {
+	// var err error
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		err = fmt.Errorf("invalid format: %v", r)
+	// 	}
+	// }()
+
 	var sb strings.Builder
 	i := 0
 	runes := []rune(format)

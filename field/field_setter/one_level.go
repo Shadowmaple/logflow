@@ -1,4 +1,4 @@
-package field
+package field_setter
 
 import "github.com/Shadowmaple/logflow/internal/event"
 

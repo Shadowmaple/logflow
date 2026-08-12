@@ -50,12 +50,12 @@ func (h *InputHandler) startOne(id int) {
 	}
 	h.outputs[id] = outputs
 
-	processor := model.NewProcessList()
+	var processor *model.ProcessNode
 	for _, filter := range filters {
-		processor.Append(filter)
+		processor = model.AppendProcessors(processor, filter)
 	}
 	for _, output := range outputs {
-		processor.Append(output)
+		processor = model.AppendProcessors(processor, output)
 	}
 
 	// 处理事件

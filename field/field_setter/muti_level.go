@@ -1,5 +1,4 @@
-package field
-
+package field_setter
 import (
 	"fmt"
 
@@ -15,7 +14,7 @@ type MultiLevelFieldSetter struct {
 
 func newMultiLevelFieldSetter(fields []string, overwrite bool) *MultiLevelFieldSetter {
 	return &MultiLevelFieldSetter{
-		preFields: fields,
+		preFields: fields[:len(fields)-1],
 		lastField: fields[len(fields)-1],
 		overwrite: overwrite,
 	}
