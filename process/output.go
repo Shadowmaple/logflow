@@ -22,12 +22,12 @@ func BuildOutputProcessors(confs []map[string]any) []*OutputProcessor {
 	return l
 }
 
-func (o *OutputProcessor) Process(event *event.Event) bool {
+func (o *OutputProcessor) Process(event *event.Event) *event.Event {
 	if err := o.Output.Handle(event); err != nil {
 		logger.Error("output process event failed", zap.Error(err))
-		return false
+		return event
 	}
-	return true
+	return event
 }
 
 func (o *OutputProcessor) Close() {

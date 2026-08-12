@@ -2,7 +2,7 @@ package model
 
 import (
 	"github.com/Shadowmaple/logflow/condition"
-	"github.com/Shadowmaple/logflow/field"
+	"github.com/Shadowmaple/logflow/field/field_setter"
 	"github.com/Shadowmaple/logflow/internal/event"
 	"github.com/Shadowmaple/logflow/internal/logger"
 
@@ -10,7 +10,7 @@ import (
 )
 
 type Filter interface {
-	Filter(event *event.Event) error
+	Filter(event *event.Event) (*event.Event, error)
 }
 
 type FilterProcessor struct {
@@ -19,7 +19,7 @@ type FilterProcessor struct {
 	condition *condition.ConditionFilter
 	config    map[string]any
 	failTag   string
-	addFields map[field.FieldSetter]any
+	addFields map[field_setter.FieldSetter]any
 	// removeFields []field_deleter.FieldDeleter
 }
 
@@ -41,10 +41,15 @@ func buildFilterProcessor(conf map[string]any, buildFilterFunc buildFilterFunc) 
 		if failTag, ok := vConf["fail_tag"]; ok {
 			p.failTag = failTag.(string)
 		}
-		if addFields, ok := vConf["add_fields"]; ok {
-			// p.addFields = make(map[field.FieldSetter]render.Render)
-			for k, v := range addFields.(map[string]any) {
-				p.addFields[field.NewFieldSetter(k, false)] = v
+		if addFieldAny, ok := vConf["add_fields"]; ok {
+			addFields, ok := addFieldAny.(map[string]any)
+			if !ok {
+				logger.Error("add_fields config is not map[string]any", zap.Any("config", addFieldAny))
+				continue
+			}
+			p.addFields = make(map[field_setter.FieldSetter]any, len(addFields))
+			for k, v := range addFields {
+				p.addFields[field_setter.NewFieldSetter(k, false)] = v
 			}
 		}
 	}
@@ -59,14 +64,15 @@ func BuildFilterProcessors(confs []map[string]any, buildFilterFunc buildFilterFu
 	return res
 }
 
-func (f *FilterProcessor) Process(event *event.Event) bool {
+func (f *FilterProcessor) Process(event *event.Event) *event.Event {
+	var err error
 	if event != nil && f.condition.Check(event) {
-		if err := f.Filter.Filter(event); err != nil {
+		if event, err = f.Filter.Filter(event); err != nil {
 			logger.Error("filter process event failed", zap.Error(err))
 			if f.failTag != "" {
-				event.Data["fail_tag"] = f.failTag
+				event.Data["@fail_tag"] = f.failTag
 			}
-			return false
+			return event
 		}
 		if f.addFields != nil {
 			for k, v := range f.addFields {
@@ -74,5 +80,14 @@ func (f *FilterProcessor) Process(event *event.Event) bool {
 			}
 		}
 	}
-	return true
+	return event
+}
+
+type FilterProcessGroup []*FilterProcessor
+
+func (f *FilterProcessGroup) Process(event *event.Event) *event.Event {
+	for _, p := range *f {
+		event = p.Process(event)
+	}
+	return event
 }

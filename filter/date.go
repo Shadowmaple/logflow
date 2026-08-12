@@ -9,9 +9,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Shadowmaple/logflow/field/field_setter"
 	"github.com/Shadowmaple/logflow/internal/event"
 	"github.com/Shadowmaple/logflow/internal/utils"
 	"github.com/Shadowmaple/logflow/model"
+	"github.com/Shadowmaple/logflow/render"
 
 	"github.com/relvacode/iso8601"
 )
@@ -150,12 +152,18 @@ func getDateParser(format string, l *time.Location, addYear bool) DateParser {
 	if format == "ISO8601" {
 		return &ISO8601Parser{l}
 	}
+
+	// 如果是yyyy-MM-dd等标准时间格式，则转换为Go时间格式
+	goFormat := utils.ConvertToGoFormat(format)
+	if goFormat != "" {
+		return &FormatParser{goFormat, l, addYear}
+	}
 	return &FormatParser{format, l, addYear}
 }
 
 // DateConfig defines the configuration structure for Date filter
 type DateConfig struct {
-	Src       string   `json:"src"`
+	Source    string   `json:"source"`
 	Target    string   `json:"target"`
 	Location  string   `json:"location"`
 	AddYear   bool     `json:"add_year"`
@@ -164,17 +172,17 @@ type DateConfig struct {
 }
 
 type DateFilter struct {
-	config      map[string]any
-	dateParsers []DateParser
-	overwrite   bool
-	src         string
-	// srcVR       render.ValueRender
-	target string
-	// targetFS    field_setter.FieldSetter
+	config       map[string]any
+	dateParsers  []DateParser
+	overwrite    bool
+	source       string
+	sourceRender render.Render
+	target       string
+	targetSetter field_setter.FieldSetter
 }
 
 func init() {
-	register("Date", newDateFilter)
+	register("date", newDateFilter)
 }
 
 func newDateFilter(config map[string]any) model.Filter {
@@ -193,18 +201,18 @@ func newDateFilter(config map[string]any) model.Filter {
 	utils.SafeDecodeConfig("date", config, &dateConfig)
 
 	// Validate required fields
-	if dateConfig.Src == "" {
-		panic("date filter: 'src' is required")
+	if dateConfig.Source == "" {
+		panic("date filter: 'source' is required")
 	}
 	if len(dateConfig.Formats) == 0 {
 		panic("date filter: 'formats' is required and cannot be empty")
 	}
 
 	plugin.overwrite = dateConfig.Overwrite
-	plugin.src = dateConfig.Src
-	// plugin.srcVR = value_render.GetValueRender2(plugin.src)
+	plugin.source = dateConfig.Source
+	plugin.sourceRender = render.GetRender(plugin.source)
 	plugin.target = dateConfig.Target
-	// plugin.targetFS = field_setter.NewFieldSetter(plugin.target)
+	plugin.targetSetter = field_setter.NewFieldSetter(plugin.target, plugin.overwrite)
 
 	// Parse location
 	var location *time.Location
@@ -224,18 +232,20 @@ func newDateFilter(config map[string]any) model.Filter {
 	return plugin
 }
 
-func (f *DateFilter) Filter(event *event.Event) error {
-	// inputI, err := plugin.srcVR.Render(event)
-	// if err != nil || inputI == nil {
-	// 	return nil
-	// }
-
-	// for _, dp := range plugin.dateParsers {
-	// 	t, err := dp.Parse(inputI)
-	// 	if err == nil {
-	// 		event = plugin.targetFS.SetField(event, t, "", plugin.overwrite)
-	// 		return nil
-	// 	}
-	// }
-	return nil
+func (f *DateFilter) Filter(event *event.Event) (*event.Event, error) {
+	// 从源字段读取值
+	sourceValue, err := f.sourceRender.Render(event)
+	if err != nil || sourceValue == nil {
+		return event, errors.New("date filter failed: get value failed")
+	}
+	// 尝试多种时间解析模式
+	for _, dp := range f.dateParsers {
+		t, err := dp.Parse(sourceValue)
+		if err == nil {
+			// 写入目标字段
+			f.targetSetter.SetField(event, t)
+			return event, nil
+		}
+	}
+	return event, errors.New("date filter failed: value parse failed")
 }

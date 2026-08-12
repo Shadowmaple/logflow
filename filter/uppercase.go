@@ -4,14 +4,14 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/Shadowmaple/logflow/field"
+	"github.com/Shadowmaple/logflow/field/field_setter"
 	"github.com/Shadowmaple/logflow/internal/event"
 	"github.com/Shadowmaple/logflow/model"
 	"github.com/Shadowmaple/logflow/render"
 )
 
 type UppercaseFilter struct {
-	fields map[field.FieldSetter]render.Render
+	fields map[field_setter.FieldSetter]render.Render
 }
 
 func init() {
@@ -23,15 +23,15 @@ func newUppercaseFilter(config map[string]any) model.Filter {
 	if !ok {
 		panic("uppercase invalid fields")
 	}
-	mp := make(map[field.FieldSetter]render.Render)
+	mp := make(map[field_setter.FieldSetter]render.Render)
 	for _, f := range fields {
-		mp[field.NewFieldSetter(f, true)] = render.GetRender(f)
+		mp[field_setter.NewFieldSetter(f, true)] = render.GetRender(f)
 	}
 	return &UppercaseFilter{fields: mp}
 }
 
 // 若遇到一个字段处理失败，则继续处理其它的，最后返回错误
-func (f *UppercaseFilter) Filter(event *event.Event) error {
+func (f *UppercaseFilter) Filter(event *event.Event) (*event.Event, error) {
 	var failed bool
 	for fieldSetter, render := range f.fields {
 		if value, err := render.Render(event); err == nil {
@@ -46,7 +46,7 @@ func (f *UppercaseFilter) Filter(event *event.Event) error {
 		}
 	}
 	if failed {
-		return errors.New("uppercase filter failed")
+		return event, errors.New("uppercase filter failed")
 	}
-	return nil
+	return event, nil
 }

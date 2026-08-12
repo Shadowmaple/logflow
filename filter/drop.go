@@ -15,7 +15,6 @@ func newDropFilter(config map[string]any) model.Filter {
 	return &DropFilter{}
 }
 
-func (f *DropFilter) Filter(event *event.Event) error {
-	event = nil
-	return nil
+func (f *DropFilter) Filter(event *event.Event) (*event.Event, error) {
+	return nil, nil
 }

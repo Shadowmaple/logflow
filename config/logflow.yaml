@@ -28,9 +28,11 @@ filter:
       source: message
   - filters:
       if: ['Exist(level)']
-      filters:
-        - strip: ['level']
-        - uppercase: ['level']
+      modules:
+        - strip:
+            fields: ['level']
+        - uppercase:
+            fields: ['level']
         - drop:
             if: ['EQ(level, "DEBUG")']
   - date:
@@ -45,7 +47,8 @@ filter:
       target: "@localtime"
       set_if_fail: '1970.01.01'
       set_if_nil: '1970.01.01'
-  - lowercase: [ "[@metadata][kafka][topic]" ]
+  - lowercase:
+      fields: ['[@metadata][kafka][topic]']
 
 output:
   - elasticsearch:
