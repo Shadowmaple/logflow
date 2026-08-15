@@ -1,4 +1,4 @@
-package render
+package field_getter
 
 import (
 	"regexp"

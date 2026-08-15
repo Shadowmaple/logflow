@@ -18,7 +18,7 @@ var options struct {
 
 func main() {
 	// flags
-	flag.StringVar(&options.config, "config", options.config, "path to configuration file or directory")
+	flag.StringVar(&options.config, "c", options.config, "path to configuration file or directory")
 
 	flag.Parse()
 

@@ -3,16 +3,16 @@ package filter
 import (
 	"strings"
 
+	"github.com/Shadowmaple/logflow/field/field_getter"
 	"github.com/Shadowmaple/logflow/field/field_setter"
 	"github.com/Shadowmaple/logflow/internal/event"
 	"github.com/Shadowmaple/logflow/internal/logger"
 	"github.com/Shadowmaple/logflow/model"
-	"github.com/Shadowmaple/logflow/render"
 )
 
 // 去除值的首尾空格、换行符、制表符等无效字符
 type StripFilter struct {
-	fields map[field_setter.FieldSetter]render.Render
+	fields map[field_setter.FieldSetter]field_getter.FieldGetter
 }
 
 func init() {
@@ -34,9 +34,9 @@ func newStripFilter(conf map[string]any) model.Filter {
 		logger.Error("strip filter config fields expression type is not array")
 		return nil
 	}
-	res := make(map[field_setter.FieldSetter]render.Render, len(fields))
+	res := make(map[field_setter.FieldSetter]field_getter.FieldGetter, len(fields))
 	for _, name := range fields {
-		res[field_setter.NewFieldSetter(name, true)] = render.GetRender(name)
+		res[field_setter.NewFieldSetter(name, true)] = field_getter.GetFieldGetter(name)
 	}
 	return &StripFilter{
 		fields: res,
@@ -45,8 +45,8 @@ func newStripFilter(conf map[string]any) model.Filter {
 
 func (f *StripFilter) Filter(event *event.Event) (*event.Event, error) {
 	var failed bool
-	for fieldSetter, render := range f.fields {
-		if value, err := render.Render(event); err == nil {
+	for fieldSetter, getter := range f.fields {
+		if value, err := getter.GetField(event); err == nil {
 			v, ok := value.(string)
 			if !ok {
 				failed = true

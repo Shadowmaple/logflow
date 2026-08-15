@@ -70,7 +70,8 @@ func (f *FilterProcessor) Process(event *event.Event) *event.Event {
 		if event, err = f.Filter.Filter(event); err != nil {
 			logger.Error("filter process event failed", zap.Error(err))
 			if f.failTag != "" {
-				event.Data["@fail_tag"] = f.failTag
+				// TODO: 标签列表
+				event.Data["@failTag"] = f.failTag
 			}
 			return event
 		}

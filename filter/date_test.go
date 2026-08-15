@@ -316,7 +316,7 @@ func TestDateFilter_AddYear(t *testing.T) {
 // --- 源字段缺失 / 异常 ---
 
 func TestDateFilter_SourceMissing(t *testing.T) {
-	// 源字段不存在时，Render 返回错误，Filter 不写入且不报错
+	// 源字段不存在时，FieldGetter 返回错误，Filter 不写入且不报错
 	f := newDateFilter(validDateConfig())
 	ev := &event.Event{Data: map[string]any{"other": "value"}}
 

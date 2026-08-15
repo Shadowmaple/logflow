@@ -1,7 +1,10 @@
 package codec
 
+import "fmt"
+
 type PlainEncoder struct{}
 
 func (e *PlainEncoder) Encode(v any) ([]byte, error) {
-	return []byte(v.(string)), nil
+	res := fmt.Sprintf("%v", v)
+	return []byte(res), nil
 }
