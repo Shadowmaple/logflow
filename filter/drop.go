@@ -11,7 +11,7 @@ func init() {
 	register("drop", newDropFilter)
 }
 
-func newDropFilter(config map[string]any) model.Filter {
+func newDropFilter(config map[any]any) model.Filter {
 	return &DropFilter{}
 }
 

@@ -59,7 +59,7 @@ func TestOneLevelFieldSetter_WritesVariousTypes(t *testing.T) {
 		{"bool", true},
 		{"time", now},
 		{"slice", []any{1, 2, 3}},
-		{"map", map[string]any{"k": "v"}},
+		{"map", map[any]any{"k": "v"}},
 		{"nil", nil},
 	}
 	for _, c := range cases {

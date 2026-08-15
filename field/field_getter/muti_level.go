@@ -1,8 +1,6 @@
 package field_getter
 
 import (
-	"fmt"
-
 	"github.com/Shadowmaple/logflow/internal/event"
 )
 
@@ -31,22 +29,22 @@ func (r *MultiLevelFieldGetter) GetField(event *event.Event) (any, error) {
 	// 逐层获取fields的值
 	for _, field := range r.preFields {
 		if cur == nil {
-			return nil, fmt.Errorf("multi level fieldgetter failed, %s not found", field)
+			return nil, ErrNotFound
 		}
 		v, ok := cur[field]
 		if !ok {
-			return nil, fmt.Errorf("multi level fieldgetter failed, %s not found", field)
+			return nil, ErrNotFound
 		}
 		cur, ok = v.(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("multi level fieldgetter failed, %s not found", field)
+			return nil, ErrInvalidType
 		}
 	}
 	if cur == nil {
-		return nil, fmt.Errorf("multi level fieldgetter failed, %s not found", r.lastField)
+		return nil, ErrNotFound
 	}
 	if val, ok := cur[r.lastField]; ok {
 		return val, nil
 	}
-	return nil, fmt.Errorf("multi level fieldgetter failed, %s not found", r.lastField)
+	return nil, ErrNotFound
 }

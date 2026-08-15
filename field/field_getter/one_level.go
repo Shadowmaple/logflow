@@ -1,8 +1,6 @@
 package field_getter
 
 import (
-	"fmt"
-
 	"github.com/Shadowmaple/logflow/internal/event"
 )
 
@@ -19,5 +17,5 @@ func (r *OneLevelFieldGetter) GetField(event *event.Event) (any, error) {
 	if val, ok := event.Data[r.field]; ok {
 		return val, nil
 	}
-	return nil, fmt.Errorf("one level fieldgetter failed, %s not found", r.field)
+	return nil, ErrNotFound
 }

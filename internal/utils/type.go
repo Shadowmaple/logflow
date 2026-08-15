@@ -93,3 +93,13 @@ func ParseToStr(value any) (string, bool) {
 	}
 	return "", false
 }
+
+func ParseToBytes(value any) ([]byte, bool) {
+	switch v := value.(type) {
+	case []byte:
+		return v, true
+	case string:
+		return []byte(TrimStr(v)), true
+	}
+	return nil, false
+}

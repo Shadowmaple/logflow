@@ -1,0 +1,29 @@
+input:
+  - random:
+      from: 1
+      to: 10
+      max_messages: 10
+  - random:
+      from: 1
+      to: 100
+      max_messages: 100
+
+filter:
+  - filters:
+      if: ['EQ(message, "10")']
+      modules:
+        - strip:
+            fields: ['level']
+            add_fields:
+                level: 'DEBUG'
+                tag: 'test'
+  - drop:
+      if: ['EQ(message, "1")']
+  - lowercase:
+      fields: ['level']
+  - uppercase:
+      fields: ['tag']
+
+output:
+  - console:
+      codec: 'json'

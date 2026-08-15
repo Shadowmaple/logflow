@@ -18,14 +18,15 @@ func init() {
 	register("uppercase", newUppercaseFilter)
 }
 
-func newUppercaseFilter(config map[string]any) model.Filter {
-	fields, ok := config["fields"].([]string)
+func newUppercaseFilter(config map[any]any) model.Filter {
+	fields, ok := config["fields"].([]any)
 	if !ok {
 		panic("uppercase invalid fields")
 	}
 	mp := make(map[field_setter.FieldSetter]field_getter.FieldGetter)
 	for _, f := range fields {
-		mp[field_setter.NewFieldSetter(f, true)] = field_getter.GetFieldGetter(f)
+		nameStr := f.(string)
+		mp[field_setter.NewFieldSetter(nameStr, true)] = field_getter.GetFieldGetter(nameStr)
 	}
 	return &UppercaseFilter{fields: mp}
 }
@@ -41,7 +42,7 @@ func (f *UppercaseFilter) Filter(event *event.Event) (*event.Event, error) {
 				continue
 			}
 			fieldSetter.SetField(event, strings.ToUpper(v))
-		} else {
+		} else if !errors.Is(err, field_getter.ErrNotFound) {
 			failed = true
 		}
 	}

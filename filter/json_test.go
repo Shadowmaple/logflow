@@ -9,7 +9,7 @@ import (
 
 func TestJsonFilter_WithTarget(t *testing.T) {
 	// 解析结果应存储到 target 字段，source 保持不变
-	f := newJsonFilter(map[string]any{
+	f := newJsonFilter(map[any]any{
 		"source": "raw",
 		"target": "parsed",
 	})
@@ -24,9 +24,9 @@ func TestJsonFilter_WithTarget(t *testing.T) {
 	if _, ok := ev.Data["raw"].([]byte); !ok {
 		t.Fatalf("raw should remain []byte, got %T", ev.Data["raw"])
 	}
-	got, ok := ev.Data["parsed"].(map[string]any)
+	got, ok := ev.Data["parsed"].(map[any]any)
 	if !ok {
-		t.Fatalf("parsed should be map[string]any, got %T", ev.Data["parsed"])
+		t.Fatalf("parsed should be map[any]any, got %T", ev.Data["parsed"])
 	}
 	if got["message"] != "hello" {
 		t.Fatalf("message = %v, want %q", got["message"], "hello")
@@ -38,7 +38,7 @@ func TestJsonFilter_WithTarget(t *testing.T) {
 
 func TestJsonFilter_WithEmptyTarget_MergesIntoData(t *testing.T) {
 	// target 为空时，解析结果应通过 maps.Copy 合并进 event.Data
-	f := newJsonFilter(map[string]any{
+	f := newJsonFilter(map[any]any{
 		"source": "raw",
 	})
 	ev := &event.Event{Data: map[string]any{
@@ -66,7 +66,7 @@ func TestJsonFilter_WithEmptyTarget_MergesIntoData(t *testing.T) {
 
 func TestJsonFilter_EmptyTarget_OverwritesExistingKeys(t *testing.T) {
 	// 合并时，解析结果中与 event.Data 同名的键应覆盖原值
-	f := newJsonFilter(map[string]any{
+	f := newJsonFilter(map[any]any{
 		"source": "raw",
 	})
 	ev := &event.Event{Data: map[string]any{
@@ -84,7 +84,7 @@ func TestJsonFilter_EmptyTarget_OverwritesExistingKeys(t *testing.T) {
 
 func TestJsonFilter_EmptyJsonObject(t *testing.T) {
 	// 空对象 {} 是合法 JSON，解析后为空 map
-	f := newJsonFilter(map[string]any{
+	f := newJsonFilter(map[any]any{
 		"source": "raw",
 		"target": "parsed",
 	})
@@ -95,9 +95,9 @@ func TestJsonFilter_EmptyJsonObject(t *testing.T) {
 	if _, err := f.Filter(ev); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	got, ok := ev.Data["parsed"].(map[string]any)
+	got, ok := ev.Data["parsed"].(map[any]any)
 	if !ok {
-		t.Fatalf("parsed should be map[string]any, got %T", ev.Data["parsed"])
+		t.Fatalf("parsed should be map[any]any, got %T", ev.Data["parsed"])
 	}
 	if len(got) != 0 {
 		t.Fatalf("parsed should be empty map, got %v", got)
@@ -105,7 +105,7 @@ func TestJsonFilter_EmptyJsonObject(t *testing.T) {
 }
 
 func TestJsonFilter_SourceNotFound(t *testing.T) {
-	f := newJsonFilter(map[string]any{
+	f := newJsonFilter(map[any]any{
 		"source": "raw",
 		"target": "parsed",
 	})
@@ -126,7 +126,7 @@ func TestJsonFilter_SourceNotFound(t *testing.T) {
 
 func TestJsonFilter_SourceNotBytes(t *testing.T) {
 	// source 存在但类型不是 []byte（如 string）应返回错误
-	f := newJsonFilter(map[string]any{
+	f := newJsonFilter(map[any]any{
 		"source": "raw",
 		"target": "parsed",
 	})
@@ -147,7 +147,7 @@ func TestJsonFilter_SourceNotBytes(t *testing.T) {
 
 func TestJsonFilter_SourceNotBytes_IntValue(t *testing.T) {
 	// 非 []byte 的其他类型同样应返回错误
-	f := newJsonFilter(map[string]any{
+	f := newJsonFilter(map[any]any{
 		"source": "raw",
 		"target": "parsed",
 	})
@@ -164,7 +164,7 @@ func TestJsonFilter_SourceNotBytes_IntValue(t *testing.T) {
 
 func TestJsonFilter_InvalidJSON(t *testing.T) {
 	// 非法 JSON 字节应返回解码错误
-	f := newJsonFilter(map[string]any{
+	f := newJsonFilter(map[any]any{
 		"source": "raw",
 		"target": "parsed",
 	})
@@ -185,7 +185,7 @@ func TestJsonFilter_InvalidJSON(t *testing.T) {
 
 func TestJsonFilter_NonObjectJSON(t *testing.T) {
 	// 合法 JSON 但非对象（如数组）无法解码进 map，应返回解码错误
-	f := newJsonFilter(map[string]any{
+	f := newJsonFilter(map[any]any{
 		"source": "raw",
 		"target": "parsed",
 	})
@@ -202,7 +202,7 @@ func TestJsonFilter_NonObjectJSON(t *testing.T) {
 
 func TestJsonFilter_EmptyTarget_EqualsMergedMap(t *testing.T) {
 	// 验证 maps.Copy 后 event.Data 的整体结构
-	f := newJsonFilter(map[string]any{
+	f := newJsonFilter(map[any]any{
 		"source": "raw",
 	})
 	ev := &event.Event{Data: map[string]any{
@@ -212,7 +212,7 @@ func TestJsonFilter_EmptyTarget_EqualsMergedMap(t *testing.T) {
 	if _, err := f.Filter(ev); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	want := map[string]any{
+	want := map[any]any{
 		"raw": []byte(`{"a":1,"b":2}`),
 		"a":   float64(1),
 		"b":   float64(2),
@@ -228,7 +228,7 @@ func TestNewJsonFilter_PanicsOnMissingSource(t *testing.T) {
 			t.Fatal("expected panic when source missing, got none")
 		}
 	}()
-	newJsonFilter(map[string]any{
+	newJsonFilter(map[any]any{
 		"target": "parsed",
 	})
 }
@@ -240,7 +240,7 @@ func TestNewJsonFilter_PanicsOnWrongSourceType(t *testing.T) {
 		}
 	}()
 	// int 不满足 string 断言
-	newJsonFilter(map[string]any{
+	newJsonFilter(map[any]any{
 		"source": 123,
 	})
 }
@@ -251,7 +251,7 @@ func TestNewJsonFilter_PanicsOnWrongTargetType(t *testing.T) {
 			t.Fatal("expected panic when target is wrong type, got none")
 		}
 	}()
-	newJsonFilter(map[string]any{
+	newJsonFilter(map[any]any{
 		"source": "raw",
 		"target": 123,
 	})
@@ -259,7 +259,7 @@ func TestNewJsonFilter_PanicsOnWrongTargetType(t *testing.T) {
 
 func TestNewJsonFilter_DefaultTargetEmpty(t *testing.T) {
 	// 仅提供 source 时，target 默认为空，Filter 走合并分支
-	f := newJsonFilter(map[string]any{
+	f := newJsonFilter(map[any]any{
 		"source": "raw",
 	})
 	ev := &event.Event{Data: map[string]any{
@@ -277,8 +277,8 @@ func TestNewJsonFilter_DefaultTargetEmpty(t *testing.T) {
 
 func TestBuildFilter_Json(t *testing.T) {
 	// 通过注册名 "json" 构建 filter
-	conf := map[string]any{
-		"json": map[string]any{
+	conf := map[any]any{
+		"json": map[any]any{
 			"source": "raw",
 			"target": "parsed",
 		},
@@ -294,9 +294,9 @@ func TestBuildFilter_Json(t *testing.T) {
 	if _, err := f.Filter(ev); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	got, ok := ev.Data["parsed"].(map[string]any)
+	got, ok := ev.Data["parsed"].(map[any]any)
 	if !ok {
-		t.Fatalf("parsed should be map[string]any, got %T", ev.Data["parsed"])
+		t.Fatalf("parsed should be map[any]any, got %T", ev.Data["parsed"])
 	}
 	if got["message"] != "BuildFilter TEST" {
 		t.Fatalf("message = %v, want %q", got["message"], "BuildFilter TEST")
@@ -305,8 +305,8 @@ func TestBuildFilter_Json(t *testing.T) {
 
 func TestBuildFilter_JsonUnknownType(t *testing.T) {
 	// 未注册的 filter 类型应返回 nil
-	f := BuildFilter(map[string]any{
-		"not_a_real_filter": map[string]any{},
+	f := BuildFilter(map[any]any{
+		"not_a_real_filter": map[any]any{},
 	})
 	if f != nil {
 		t.Fatalf("expected nil filter for unknown type, got %T", f)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Shadowmaple/logflow/internal/event"
 	"github.com/Shadowmaple/logflow/internal/logger"
+	"github.com/Shadowmaple/logflow/internal/utils"
 	"github.com/Shadowmaple/logflow/model"
 
 	"go.uber.org/zap"
@@ -18,24 +19,24 @@ type JsonFilter struct {
 	Target string
 }
 
-func (jf *JsonFilter) Filter(event *event.Event) (newEvent *event.Event, err error) {
+func (jf *JsonFilter) Filter(event *event.Event) (*event.Event, error) {
 	// 从source解析json，并将结果存储到target
 	raw, ok := event.Data[jf.Source]
 	if !ok {
-		logger.Error("json filter: source not found")
-		return nil, errors.New("source not found")
+		logger.Warn("json filter: source not found")
+		return event, errors.New("source not found")
 	}
 	// 判断类型是否为[]byte
-	rawStr, ok := raw.([]byte)
+	rawStr, ok := utils.ParseToBytes(raw)
 	if !ok {
-		logger.Error("json filter: source is not a []byte")
-		return nil, errors.New("invalid source")
+		logger.Warn("json filter: source is not a []byte", zap.Any("value", raw))
+		return event, errors.New("invalid source")
 	}
 	// 解析json
 	var data map[string]any
-	if err = json.Unmarshal(rawStr, &data); err != nil {
-		logger.Error("json filter: decode failed:"+err.Error(), zap.String("data", string(rawStr)))
-		return nil, errors.New("JSON decode failed")
+	if err := json.Unmarshal(rawStr, &data); err != nil {
+		logger.Warn("json filter: decode failed:"+err.Error(), zap.String("data", string(rawStr)))
+		return event, errors.New("JSON decode failed")
 	}
 	// 将解析结果存储到target
 	if jf.Target != "" {
@@ -47,7 +48,7 @@ func (jf *JsonFilter) Filter(event *event.Event) (newEvent *event.Event, err err
 	return event, nil
 }
 
-func newJsonFilter(conf map[string]any) model.Filter {
+func newJsonFilter(conf map[any]any) model.Filter {
 	f := &JsonFilter{
 		Target: "",
 	}

@@ -1,0 +1,51 @@
+system:
+  worker: 1
+  logger:
+    level: 'debug'
+    format: 'console'
+    output: 'stdout'
+
+input:
+  - random:
+      from: 1
+      to: 1
+      max_messages: 1
+
+filter:
+  - filters:
+      if: ['EQ(message, "1")']
+      modules:
+        - strip:
+            fields: ['level']
+            add_fields:
+              tag: 'test'
+              msg: '{"datatime": "2026-08-15 21:48:00.212", "level": "info", "@metadata": {"kafka": {"topic": "TesT-1"}}}'
+  - json:
+      source: msg
+  - filters:
+      if: ['Exist(level)']
+      modules:
+        - strip:
+            fields: ['level']
+        - uppercase:
+            fields: ['level']
+        - drop:
+            if: ['EQ(level, "DEBUG")']
+  - date:
+      location: 'Asia/Shanghai'
+      source: datatime
+      formats: ['yyyy-MM-dd HH:mm:ss.SSS']
+      target: datatime
+  - dateFormat:
+      source: datatime
+      location: 'Asia/Shanghai'
+      format: 'yyyy.MM.dd'
+      target: "@localtime"
+      set_if_fail: '1970.01.01'
+      set_if_nil: '1970.01.01'
+  - lowercase:
+      fields: ['[@metadata][kafka][topic]']
+
+output:
+  - console:
+      codec: 'json'

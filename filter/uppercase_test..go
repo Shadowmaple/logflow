@@ -7,7 +7,7 @@ import (
 )
 
 func TestUppercaseFilter_SingleField(t *testing.T) {
-	f := newUppercaseFilter(map[string]any{
+	f := newUppercaseFilter(map[any]any{
 		"fields": []string{"message"},
 	})
 	ev := &event.Event{Data: map[string]any{"message": "Hello WORLD 123"}}
@@ -21,7 +21,7 @@ func TestUppercaseFilter_SingleField(t *testing.T) {
 }
 
 func TestUppercaseFilter_MultipleFields(t *testing.T) {
-	f := newUppercaseFilter(map[string]any{
+	f := newUppercaseFilter(map[any]any{
 		"fields": []string{"message", "host"},
 	})
 	ev := &event.Event{Data: map[string]any{
@@ -41,7 +41,7 @@ func TestUppercaseFilter_MultipleFields(t *testing.T) {
 }
 
 func TestUppercaseFilter_AlreadyUppercase(t *testing.T) {
-	f := newUppercaseFilter(map[string]any{
+	f := newUppercaseFilter(map[any]any{
 		"fields": []string{"message"},
 	})
 	ev := &event.Event{Data: map[string]any{"message": "already lower"}}
@@ -56,7 +56,7 @@ func TestUppercaseFilter_AlreadyUppercase(t *testing.T) {
 
 func TestUppercaseFilter_BracketSingleLevel(t *testing.T) {
 	// "[message]" 等价于单层级字段 message
-	f := newUppercaseFilter(map[string]any{
+	f := newUppercaseFilter(map[any]any{
 		"fields": []string{"[message]"},
 	})
 	ev := &event.Event{Data: map[string]any{"message": "HELLO"}}
@@ -70,7 +70,7 @@ func TestUppercaseFilter_BracketSingleLevel(t *testing.T) {
 }
 
 func TestUppercaseFilter_EmptyFields(t *testing.T) {
-	f := newUppercaseFilter(map[string]any{
+	f := newUppercaseFilter(map[any]any{
 		"fields": []string{},
 	})
 	ev := &event.Event{Data: map[string]any{"message": "HELLO"}}
@@ -85,7 +85,7 @@ func TestUppercaseFilter_EmptyFields(t *testing.T) {
 }
 
 func TestUppercaseFilter_FieldNotFound(t *testing.T) {
-	f := newUppercaseFilter(map[string]any{
+	f := newUppercaseFilter(map[any]any{
 		"fields": []string{"missing"},
 	})
 	ev := &event.Event{Data: map[string]any{"message": "HELLO"}}
@@ -104,7 +104,7 @@ func TestUppercaseFilter_FieldNotFound(t *testing.T) {
 }
 
 func TestUppercaseFilter_NonStringValue(t *testing.T) {
-	f := newUppercaseFilter(map[string]any{
+	f := newUppercaseFilter(map[any]any{
 		"fields": []string{"count"},
 	})
 	ev := &event.Event{Data: map[string]any{"count": 123}}
@@ -122,7 +122,7 @@ func TestUppercaseFilter_NonStringValue(t *testing.T) {
 func TestUppercaseFilter_MixedSuccessAndFailure(t *testing.T) {
 	// 部分字段处理成功、部分失败时，成功的字段仍应被转换，
 	// 同时整体返回错误
-	f := newUppercaseFilter(map[string]any{
+	f := newUppercaseFilter(map[any]any{
 		"fields": []string{"message", "missing"},
 	})
 	ev := &event.Event{Data: map[string]any{"message": "HELLO"}}
@@ -142,7 +142,7 @@ func TestNewUppercaseFilter_PanicsOnMissingFields(t *testing.T) {
 			t.Fatal("expected panic when fields missing, got none")
 		}
 	}()
-	newUppercaseFilter(map[string]any{})
+	newUppercaseFilter(map[any]any{})
 }
 
 func TestNewUppercaseFilter_PanicsOnWrongType(t *testing.T) {
@@ -152,7 +152,7 @@ func TestNewUppercaseFilter_PanicsOnWrongType(t *testing.T) {
 		}
 	}()
 	// []any 不满足 []string 断言
-	newUppercaseFilter(map[string]any{
+	newUppercaseFilter(map[any]any{
 		"fields": []any{"message"},
 	})
 }
@@ -168,8 +168,8 @@ func TestNewUppercaseFilter_PanicsOnNilConfig(t *testing.T) {
 
 func TestBuildFilter_Uppercase(t *testing.T) {
 	// 通过注册名 "uppercase" 构建 filter
-	conf := map[string]any{
-		"uppercase": map[string]any{
+	conf := map[any]any{
+		"uppercase": map[any]any{
 			"fields": []string{"message"},
 		},
 	}
@@ -189,8 +189,8 @@ func TestBuildFilter_Uppercase(t *testing.T) {
 
 func TestBuildFilter_UppercaseUnknownType(t *testing.T) {
 	// 未注册的 filter 类型应返回 nil
-	f := BuildFilter(map[string]any{
-		"not_a_real_filter": map[string]any{},
+	f := BuildFilter(map[any]any{
+		"not_a_real_filter": map[any]any{},
 	})
 	if f != nil {
 		t.Fatalf("expected nil filter for unknown type, got %T", f)

@@ -10,8 +10,8 @@ import (
 )
 
 // validDateConfig 返回一个最小可用的 date 配置（ISO8601 解析，写入 @timestamp）
-func validDateConfig() map[string]any {
-	return map[string]any{
+func validDateConfig() map[any]any {
+	return map[any]any{
 		"source":  "logtime",
 		"target":  "@timestamp",
 		"formats": []string{"ISO8601"},
@@ -401,8 +401,8 @@ func TestNewDateFilter_PanicsOnInvalidLocation(t *testing.T) {
 
 func TestBuildFilter_Date(t *testing.T) {
 	// 通过注册名 "Date" 构建 filter
-	conf := map[string]any{
-		"date": map[string]any{
+	conf := map[any]any{
+		"date": map[any]any{
 			"source":  "logtime",
 			"target":  "@timestamp",
 			"formats": []string{"ISO8601"},

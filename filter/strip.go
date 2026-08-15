@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/Shadowmaple/logflow/field/field_getter"
@@ -19,7 +20,7 @@ func init() {
 	register("strip", newStripFilter)
 }
 
-func newStripFilter(conf map[string]any) model.Filter {
+func newStripFilter(conf map[any]any) model.Filter {
 	if conf == nil {
 		logger.Warn("strip filter config is nil")
 		return nil
@@ -29,14 +30,15 @@ func newStripFilter(conf map[string]any) model.Filter {
 		logger.Warn("strip filter config is missing fields expression")
 		return nil
 	}
-	fields, ok := fieldAny.([]string)
+	fields, ok := fieldAny.([]any)
 	if !ok {
 		logger.Error("strip filter config fields expression type is not array")
 		return nil
 	}
 	res := make(map[field_setter.FieldSetter]field_getter.FieldGetter, len(fields))
 	for _, name := range fields {
-		res[field_setter.NewFieldSetter(name, true)] = field_getter.GetFieldGetter(name)
+		nameStr := name.(string)
+		res[field_setter.NewFieldSetter(nameStr, true)] = field_getter.GetFieldGetter(nameStr)
 	}
 	return &StripFilter{
 		fields: res,
@@ -53,12 +55,12 @@ func (f *StripFilter) Filter(event *event.Event) (*event.Event, error) {
 				continue
 			}
 			fieldSetter.SetField(event, strings.TrimSpace(v))
-		} else {
+		} else if !errors.Is(err, field_getter.ErrNotFound) {
 			failed = true
 		}
 	}
 	if failed {
-		logger.Error("strip filter failed")
+		return nil, errors.New("strip filter failed")
 	}
 	return event, nil
 }

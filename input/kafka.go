@@ -309,7 +309,7 @@ func (ki *KafkaInput) ReceiveOne() *event.Event {
 			}
 		}
 		if ki.decorateEvents {
-			data["@metadata"] = map[string]any{"kafka": map[string]any{
+			data["@metadata"] = map[any]any{"kafka": map[any]any{
 				"topic":     msg.Topic,
 				"partition": msg.Partition,
 				"offset":    msg.Offset,

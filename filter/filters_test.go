@@ -7,15 +7,15 @@ import (
 )
 
 func TestFilters(t *testing.T) {
-	conf := map[string]any{
-		"modules": []map[string]any{
+	conf := map[any]any{
+		"modules": []map[any]any{
 			{
-				"strip": map[string]any{
+				"strip": map[any]any{
 					"fields": []string{"level"},
 				},
 			},
 			{
-				"uppercase": map[string]any{
+				"uppercase": map[any]any{
 					"fields": []string{"level"},
 				},
 			},
