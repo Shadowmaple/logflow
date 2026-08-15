@@ -15,6 +15,9 @@ func newOneLevelFieldSetter(field string, overwrite bool) *OneLevelFieldSetter {
 }
 
 func (f *OneLevelFieldSetter) SetField(event *event.Event, value any) {
+	if event == nil {
+		return
+	}
 	if _, ok := event.Data[f.field]; !ok || f.overwrite {
 		event.Data[f.field] = value
 		return

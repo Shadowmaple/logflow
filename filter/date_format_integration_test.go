@@ -83,7 +83,7 @@ package filter
 // 	return nil
 // }
 
-// func newDateParseFilter(conf map[string]any) model.Filter {
+// func newDateParseFilter(conf map[any]any) model.Filter {
 // 	f := &dateParseFilter{layout: time.RFC3339}
 // 	if v, ok := conf["src"]; ok {
 // 		f.src = v.(string)
@@ -110,7 +110,7 @@ package filter
 
 // // runPipeline 用给定的 filter 配置构建处理链，将 input 中的事件依次送入管道，
 // // 返回到达末端的捕获输出。模拟 process.InputHandler.startOne 的事件处理循环。
-// func runPipeline(t *testing.T, filterConfs []map[string]any, in model.Input) *captureOutput {
+// func runPipeline(t *testing.T, filterConfs []map[any]any, in model.Input) *captureOutput {
 // 	t.Helper()
 // 	out := &captureOutput{}
 
@@ -136,10 +136,10 @@ package filter
 // // json -> dateparse -> dateFormat -> output。
 // // JSON 消息中的 ISO8601 字符串被解析为 time.Time，再由 dateFormat 格式化。
 // func TestDateFormatPipeline_EndToEnd(t *testing.T) {
-// 	filterConfs := []map[string]any{
-// 		{"json": map[string]any{"source": "message"}},
-// 		{"dateparse": map[string]any{"src": "logtime", "target": "logtime"}},
-// 		{"dateFormat": map[string]any{
+// 	filterConfs := []map[any]any{
+// 		{"json": map[any]any{"source": "message"}},
+// 		{"dateparse": map[any]any{"src": "logtime", "target": "logtime"}},
+// 		{"dateFormat": map[any]any{
 // 			"source":   "logtime",
 // 			"target":   "@timestamp",
 // 			"format":   "yyyy-MM-dd HH:mm:ss",
@@ -148,7 +148,7 @@ package filter
 // 	}
 // 	raw := `{"logtime":"2024-01-15T10:30:45Z","level":"INFO"}`
 // 	in := &sliceInput{events: []*event.Event{
-// 		newEvent(map[string]any{"message": raw}),
+// 		newEvent(map[any]any{"message": raw}),
 // 	}}
 
 // 	out := runPipeline(t, filterConfs, in)
@@ -174,8 +174,8 @@ package filter
 // // TestDateFormatPipeline_ConditionGates 验证通过 if 条件控制 dateFormat 是否执行。
 // // 条件不满足时 dateFormat 被跳过，事件仍继续流向 output。
 // func TestDateFormatPipeline_ConditionGates(t *testing.T) {
-// 	filterConfs := []map[string]any{
-// 		{"dateFormat": map[string]any{
+// 	filterConfs := []map[any]any{
+// 		{"dateFormat": map[any]any{
 // 			"source": "logtime",
 // 			"target": "@timestamp",
 // 			"format": "yyyy-MM-dd",
@@ -183,8 +183,8 @@ package filter
 // 		}},
 // 	}
 // 	in := &sliceInput{events: []*event.Event{
-// 		newEvent(map[string]any{"logtime": testTime}),
-// 		newEvent(map[string]any{"message": "no time here"}),
+// 		newEvent(map[any]any{"logtime": testTime}),
+// 		newEvent(map[any]any{"message": "no time here"}),
 // 	}}
 
 // 	out := runPipeline(t, filterConfs, in)
@@ -205,8 +205,8 @@ package filter
 // // 即使源字段类型错误且配置了 fail_tag，dateFormat 也永不返回错误，
 // // 因此事件不会被丢弃，也不会被打上 fail_tag。
 // func TestDateFormatPipeline_NeverDropsOrFailTag(t *testing.T) {
-// 	filterConfs := []map[string]any{
-// 		{"dateFormat": map[string]any{
+// 	filterConfs := []map[any]any{
+// 		{"dateFormat": map[any]any{
 // 			"source":   "logtime",
 // 			"target":   "@timestamp",
 // 			"format":   "yyyy-MM-dd",
@@ -214,7 +214,7 @@ package filter
 // 		}},
 // 	}
 // 	in := &sliceInput{events: []*event.Event{
-// 		newEvent(map[string]any{"logtime": "not-a-time"}),
+// 		newEvent(map[any]any{"logtime": "not-a-time"}),
 // 	}}
 
 // 	out := runPipeline(t, filterConfs, in)
@@ -231,8 +231,8 @@ package filter
 
 // // TestDateFormatPipeline_SetIfFailFlowsThrough 验证 set_if_fail 的回退值能流经管道到达 output。
 // func TestDateFormatPipeline_SetIfFailFlowsThrough(t *testing.T) {
-// 	filterConfs := []map[string]any{
-// 		{"dateFormat": map[string]any{
+// 	filterConfs := []map[any]any{
+// 		{"dateFormat": map[any]any{
 // 			"source":      "logtime",
 // 			"target":      "@timestamp",
 // 			"format":      "yyyy-MM-dd",
@@ -240,7 +240,7 @@ package filter
 // 		}},
 // 	}
 // 	in := &sliceInput{events: []*event.Event{
-// 		newEvent(map[string]any{"logtime": 12345}),
+// 		newEvent(map[any]any{"logtime": 12345}),
 // 	}}
 
 // 	out := runPipeline(t, filterConfs, in)
@@ -254,8 +254,8 @@ package filter
 
 // // TestDateFormatPipeline_SetIfNilFlowsThrough 验证源字段缺失时 set_if_nil 的值能流经管道到达 output。
 // func TestDateFormatPipeline_SetIfNilFlowsThrough(t *testing.T) {
-// 	filterConfs := []map[string]any{
-// 		{"dateFormat": map[string]any{
+// 	filterConfs := []map[any]any{
+// 		{"dateFormat": map[any]any{
 // 			"source":     "logtime",
 // 			"target":     "@timestamp",
 // 			"format":     "yyyy-MM-dd",
@@ -263,7 +263,7 @@ package filter
 // 		}},
 // 	}
 // 	in := &sliceInput{events: []*event.Event{
-// 		newEvent(map[string]any{"message": "no logtime field"}),
+// 		newEvent(map[any]any{"message": "no logtime field"}),
 // 	}}
 
 // 	out := runPipeline(t, filterConfs, in)
@@ -280,13 +280,13 @@ package filter
 // // dateFormat 与 output 都不会收到该事件。
 // // 这与 dateFormat 自身“永不丢弃事件”的行为形成对比。
 // func TestDateFormatPipeline_PrecedingFilterDropsEvent(t *testing.T) {
-// 	filterConfs := []map[string]any{
+// 	filterConfs := []map[any]any{
 // 		// json filter 在 source 字段缺失时返回错误
-// 		{"json": map[string]any{
+// 		{"json": map[any]any{
 // 			"source":   "message",
 // 			"fail_tag": "json_failed",
 // 		}},
-// 		{"dateFormat": map[string]any{
+// 		{"dateFormat": map[any]any{
 // 			"source": "logtime",
 // 			"target": "@timestamp",
 // 			"format": "yyyy-MM-dd",
@@ -294,7 +294,7 @@ package filter
 // 	}
 // 	// 事件中没有 message 字段 -> json filter 返回错误 -> 事件被丢弃
 // 	in := &sliceInput{events: []*event.Event{
-// 		newEvent(map[string]any{"logtime": testTime}),
+// 		newEvent(map[any]any{"logtime": testTime}),
 // 	}}
 
 // 	out := runPipeline(t, filterConfs, in)
@@ -306,17 +306,17 @@ package filter
 // // TestDateFormatPipeline_ChainedWithDownstreamFilter 验证 dateFormat 的输出可被
 // // 后续 filter 消费：dateFormat 写入 @timestamp 后，lowercase 对其再处理。
 // func TestDateFormatPipeline_ChainedWithDownstreamFilter(t *testing.T) {
-// 	filterConfs := []map[string]any{
-// 		{"dateFormat": map[string]any{
+// 	filterConfs := []map[any]any{
+// 		{"dateFormat": map[any]any{
 // 			"source": "logtime",
 // 			"target": "ts",
 // 			"format": "yyyy-MM-dd z", // z 为时区名，UTC 时间 -> "UTC"
 // 		}},
 // 		// 对 ts 字段做小写处理，验证 dateFormat 的输出能被下游读取
-// 		{"lowercase": map[string]any{"fields": []string{"ts"}}},
+// 		{"lowercase": map[any]any{"fields": []string{"ts"}}},
 // 	}
 // 	in := &sliceInput{events: []*event.Event{
-// 		newEvent(map[string]any{"logtime": testTime}),
+// 		newEvent(map[any]any{"logtime": testTime}),
 // 	}}
 
 // 	out := runPipeline(t, filterConfs, in)

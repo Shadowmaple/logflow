@@ -13,7 +13,7 @@ type OutputProcessor struct {
 	model.Output
 }
 
-func BuildOutputProcessors(confs []map[string]any) []*OutputProcessor {
+func BuildOutputProcessors(confs []map[any]any) []*OutputProcessor {
 	outputs := output.BuildOutputs(confs)
 	l := make([]*OutputProcessor, 0, len(outputs))
 	for _, o := range outputs {

@@ -14,7 +14,7 @@ func TestConditionFilterCheck(t *testing.T) {
 		"items": []any{"test", 1},
 	}}
 
-	filter := NewConditionFilter(map[string]any{
+	filter := NewConditionFilter(map[any]any{
 		"if": []any{
 			"EQ(level, \"DEBUG\")",
 			"EXIST(msg)",
@@ -38,7 +38,7 @@ func TestConditionFilterCheckWithAndAndNotIn(t *testing.T) {
 		"items": []any{"test", 2},
 	}}
 
-	filter := NewConditionFilter(map[string]any{
+	filter := NewConditionFilter(map[any]any{
 		"if": []any{
 			"EQ(level, \"INFO\")",
 			"NotIn(items, \"prod\")",
@@ -49,7 +49,7 @@ func TestConditionFilterCheckWithAndAndNotIn(t *testing.T) {
 		t.Fatal("expected condition filter to pass")
 	}
 
-	filter = NewConditionFilter(map[string]any{
+	filter = NewConditionFilter(map[any]any{
 		"if": []any{
 			"EQ(level, \"INFO\")",
 			"NotIn(items, \"test\")",
@@ -66,7 +66,7 @@ func TestConditionFilterCheckWithNil(t *testing.T) {
 		"value": nil,
 	}}
 
-	filter := NewConditionFilter(map[string]any{
+	filter := NewConditionFilter(map[any]any{
 		"if": []any{
 			"EQ(value, nil)",
 		},
@@ -83,7 +83,7 @@ func TestConditionFilterCheckWithMixedAndOr(t *testing.T) {
 		"msg":   "hello",
 	}}
 
-	filter := NewConditionFilter(map[string]any{
+	filter := NewConditionFilter(map[any]any{
 		"if": []any{
 			"EQ(level, \"DEBUG\") || EQ(level, \"INFO\")",
 			"EXIST(msg)",

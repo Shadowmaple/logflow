@@ -40,7 +40,7 @@ func init() {
 	register("dateFormat", newDateFormatFilter)
 }
 
-func newDateFormatFilter(config map[string]any) model.Filter {
+func newDateFormatFilter(config map[any]any) model.Filter {
 	f := &DateFormatFilter{
 		overwrite: true,
 	}
@@ -48,8 +48,10 @@ func newDateFormatFilter(config map[string]any) model.Filter {
 	// Parse configuration using SafeDecodeConfig
 	var dateFormatConfig DateFormatConfig
 	dateFormatConfig.Overwrite = true
+	// Convert config to JSON-serializable format
+	jsonConfig := utils.ConvertToJSONCompatible(config)
 
-	utils.SafeDecodeConfig("dateFormat", config, &dateFormatConfig)
+	utils.SafeDecodeConfig("dateFormat", jsonConfig.(map[string]any), &dateFormatConfig)
 
 	// Validate required fields
 	if dateFormatConfig.Source == "" {

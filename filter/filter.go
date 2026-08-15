@@ -3,15 +3,9 @@ package filter
 import (
 	"github.com/Shadowmaple/logflow/internal/logger"
 	"github.com/Shadowmaple/logflow/model"
-
-	"go.uber.org/zap"
 )
 
-// type Filter interface {
-// 	Filter(event *event.Event) error
-// }
-
-func BuildFilters(conf []map[string]any) []model.Filter {
+func BuildFilters(conf []map[any]any) []model.Filter {
 	if conf == nil {
 		return nil
 	}
@@ -25,13 +19,12 @@ func BuildFilters(conf []map[string]any) []model.Filter {
 	return filters
 }
 
-func BuildFilter(conf map[string]any) model.Filter {
+func BuildFilter(conf map[any]any) model.Filter {
 	if conf == nil {
 		return nil
 	}
 	for k, v := range conf {
-		filterType, filterConf := k, v.(map[string]any)
-		logger.Info("filter config type: "+filterType, zap.Any("conf", filterConf))
+		filterType, filterConf := k.(string), v.(map[any]any)
 		if handler, ok := filterHandlers[filterType]; ok {
 			return handler(filterConf)
 		}
@@ -40,8 +33,19 @@ func BuildFilter(conf map[string]any) model.Filter {
 	return nil
 }
 
-var filterHandlers = make(map[string]func(conf map[string]any) model.Filter)
+func BuildFilterByType(filterType string, conf map[any]any) model.Filter {
+	if conf == nil {
+		return nil
+	}
+	if handler, ok := filterHandlers[filterType]; ok {
+		return handler(conf)
+	}
+	logger.Error("filter config type not found: " + filterType)
+	return nil
+}
 
-func register(name string, f func(conf map[string]any) model.Filter) {
+var filterHandlers = make(map[string]func(conf map[any]any) model.Filter)
+
+func register(name string, f func(conf map[any]any) model.Filter) {
 	filterHandlers[name] = f
 }

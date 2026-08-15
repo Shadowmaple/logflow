@@ -8,8 +8,8 @@ import (
 )
 
 // validDateFormatConfig 返回一个最小可用的 dateFormat 配置
-func validDateFormatConfig() map[string]any {
-	return map[string]any{
+func validDateFormatConfig() map[any]any {
+	return map[any]any{
 		"source": "logtime",
 		"target": "@timestamp",
 		"format": "yyyy-MM-dd HH:mm:ss",
@@ -274,8 +274,8 @@ func TestNewDateFormatFilter_PanicsOnInvalidLocation(t *testing.T) {
 
 func TestBuildFilter_DateFormat(t *testing.T) {
 	// 通过注册名 "dateFormat" 构建 filter
-	conf := map[string]any{
-		"dateFormat": map[string]any{
+	conf := map[any]any{
+		"dateFormat": map[any]any{
 			"source": "logtime",
 			"target": "@timestamp",
 			"format": "yyyy-MM-dd",

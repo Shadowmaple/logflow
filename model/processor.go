@@ -2,9 +2,6 @@ package model
 
 import (
 	"github.com/Shadowmaple/logflow/internal/event"
-	"github.com/Shadowmaple/logflow/internal/logger"
-
-	"go.uber.org/zap"
 )
 
 type Processor interface {
@@ -38,9 +35,7 @@ func AppendProcessors(head *ProcessNode, processors ...Processor) *ProcessNode {
 }
 
 func (pn *ProcessNode) Process(event *event.Event) *event.Event {
-	if event = pn.P.Process(event); event == nil {
-		logger.Error("process event failed", zap.String("event", event.String()))
-	}
+	event = pn.P.Process(event)
 	if event != nil && pn.Next != nil {
 		return pn.Next.Process(event)
 	}

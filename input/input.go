@@ -13,15 +13,15 @@ func Register(name string, f InputHander) {
 	inputHandlers[name] = f
 }
 
-func NewInput(conf map[string]any) model.Input {
+func NewInput(conf map[any]any) model.Input {
 	if conf == nil {
 		panic("input config is nil")
 	}
 	for k, v := range conf {
-		if handler, ok := inputHandlers[k]; ok {
+		if handler, ok := inputHandlers[k.(string)]; ok {
 			return handler(v.(map[any]any))
 		}
-		logger.Fatal("invalid input type: " + k)
+		logger.Fatal("invalid input type: " + k.(string))
 	}
 	return nil
 }

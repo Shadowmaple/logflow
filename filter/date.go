@@ -172,20 +172,20 @@ type DateConfig struct {
 }
 
 type DateFilter struct {
-	config       map[string]any
-	dateParsers  []DateParser
-	overwrite    bool
-	source       string
+	config            map[any]any
+	dateParsers       []DateParser
+	overwrite         bool
+	source            string
 	sourceFieldGetter field_getter.FieldGetter
-	target       string
-	targetSetter field_setter.FieldSetter
+	target            string
+	targetSetter      field_setter.FieldSetter
 }
 
 func init() {
 	register("date", newDateFilter)
 }
 
-func newDateFilter(config map[string]any) model.Filter {
+func newDateFilter(config map[any]any) model.Filter {
 	plugin := &DateFilter{
 		config:      config,
 		dateParsers: make([]DateParser, 0),
@@ -197,8 +197,10 @@ func newDateFilter(config map[string]any) model.Filter {
 	dateConfig.Target = "@timestamp"
 	dateConfig.Overwrite = true
 	dateConfig.AddYear = false
+	// Convert config to JSON-serializable format
+	jsonConfig := utils.ConvertToJSONCompatible(config)
 
-	utils.SafeDecodeConfig("date", config, &dateConfig)
+	utils.SafeDecodeConfig("date", jsonConfig.(map[string]any), &dateConfig)
 
 	// Validate required fields
 	if dateConfig.Source == "" {

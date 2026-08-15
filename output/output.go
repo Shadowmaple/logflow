@@ -11,14 +11,14 @@ func Register(name string, handler func(map[any]any) model.Output) {
 	outputHandlers[name] = handler
 }
 
-func BuildOutputs(configs []map[string]any) []model.Output {
+func BuildOutputs(configs []map[any]any) []model.Output {
 	outputs := make([]model.Output, 0, len(configs))
 	for _, config := range configs {
 		for k, v := range config {
-			if handler, ok := outputHandlers[k]; ok {
+			if handler, ok := outputHandlers[k.(string)]; ok {
 				outputs = append(outputs, handler(v.(map[any]any)))
 			} else {
-				logger.Fatal("output: unknown type " + k)
+				logger.Fatal("output: unknown type " + k.(string))
 			}
 		}
 	}

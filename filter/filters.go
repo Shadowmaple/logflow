@@ -15,19 +15,25 @@ func init() {
 	register("filters", newFiltersFilter)
 }
 
-func newFiltersFilter(conf map[string]any) model.Filter {
+func newFiltersFilter(conf map[any]any) model.Filter {
 	if conf == nil {
-		logger.Warn("filters filter config is nil")
+		logger.Fatal("filters filter config is nil")
 		return nil
 	}
 	// 获取其它modules的配置
-	filtersConf, ok := conf["modules"].([]map[string]any)
+	moduleConfs, ok := conf["modules"].([]any)
 	if !ok {
-		logger.Warn("filters modules config is not a list")
+		logger.Fatal("filters modules config is not a list")
 		return nil
 	}
+
+	moduleConfMapList := make([]map[any]any, len(moduleConfs))
+	for i, c := range moduleConfs {
+		moduleConfMapList[i] = c.(map[any]any)
+	}
+
 	// 创建 filters 处理节点
-	processors := model.BuildFilterProcessors(filtersConf, BuildFilter)
+	processors := model.BuildFilterProcessors(moduleConfMapList, BuildFilter)
 
 	// 构建处理链表
 	var processorHead *model.ProcessNode

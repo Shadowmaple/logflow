@@ -69,6 +69,4 @@ func (p *ConsoleInput) ReceiveOne() *event.Event {
 	return nil
 }
 
-func (p *ConsoleInput) Close() {
-	// p.stop = true
-}
+func (p *ConsoleInput) Close() {}

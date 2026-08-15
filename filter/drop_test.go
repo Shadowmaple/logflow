@@ -7,7 +7,7 @@ import (
 )
 
 func TestDrop(t *testing.T) {
-	conf := map[string]any{
+	conf := map[any]any{
 		"if": []string{`EQ(level, "DEBUG")`},
 	}
 	f := newDropFilter(conf)

@@ -18,14 +18,15 @@ func init() {
 	register("lowercase", newLowercaseFilter)
 }
 
-func newLowercaseFilter(config map[string]any) model.Filter {
-	fields, ok := config["fields"].([]string)
+func newLowercaseFilter(config map[any]any) model.Filter {
+	fields, ok := config["fields"].([]any)
 	if !ok {
 		panic("lowercase invalid fields")
 	}
 	mp := make(map[field_setter.FieldSetter]field_getter.FieldGetter)
-	for _, fieldName := range fields {
-		mp[field_setter.NewFieldSetter(fieldName, true)] = field_getter.GetFieldGetter(fieldName)
+	for _, f := range fields {
+		nameStr := f.(string)
+		mp[field_setter.NewFieldSetter(nameStr, true)] = field_getter.GetFieldGetter(nameStr)
 	}
 	return &LowercaseFilter{fields: mp}
 }
@@ -41,7 +42,7 @@ func (f *LowercaseFilter) Filter(event *event.Event) (*event.Event, error) {
 				continue
 			}
 			fieldSetter.SetField(event, strings.ToLower(v))
-		} else {
+		} else if !errors.Is(err, field_getter.ErrNotFound) {
 			failed = true
 		}
 	}

@@ -1,4 +1,5 @@
 package field_setter
+
 import (
 	"fmt"
 
@@ -23,6 +24,9 @@ func newMultiLevelFieldSetter(fields []string, overwrite bool) *MultiLevelFieldS
 // 如果不存在该层级的field，则创建一个新的map写入
 // 若非最后一层的field不是map，则跳过。TODO：是否需要判断overwrite
 func (f *MultiLevelFieldSetter) SetField(event *event.Event, value any) {
+	if event == nil {
+		return
+	}
 	var cur = event.Data
 	for _, pre := range f.preFields {
 		if _, ok := cur[pre]; !ok {

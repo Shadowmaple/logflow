@@ -28,13 +28,13 @@ func buildInputHandler(config *config.Config, idx int) *InputHandler {
 	return &InputHandler{
 		config:  config,
 		input:   input,
-		outputs: make([][]*OutputProcessor, config.Worker),
+		outputs: make([][]*OutputProcessor, config.System.Worker),
 	}
 }
 
 // Start 启动所有处理任务
 func (h *InputHandler) start() {
-	for i := 0; i < h.config.Worker; i++ {
+	for i := 0; i < h.config.System.Worker; i++ {
 		go h.startOne(i)
 	}
 }
@@ -72,7 +72,7 @@ func (h *InputHandler) startOne(id int) {
 		processor.Process(event)
 	}
 
-	logger.Info("InputHandler startOne gets close signal and quickly receives all events")
+	logger.Debug("InputHandler startOne gets close signal and quickly receives all events")
 	// 快速将未消费完的事件发送到下一个处理线程
 	// TODO: 如果es集群挂了，链路一直卡住，那就一直无法关闭
 	wg := new(sync.WaitGroup)
@@ -86,19 +86,19 @@ func (h *InputHandler) startOne(id int) {
 		})
 	}
 	wg.Wait()
-	logger.Info("InputHandler startOne quickly receives all events ok")
+	logger.Debug("InputHandler startOne quickly receives all events ok")
 }
 
 func (h *InputHandler) close() {
-	logger.Info("InputHandler close input...")
+	logger.Debug("InputHandler close input...")
 	h.stop = true
 	h.input.Close()
 	h.closeOutputs()
-	logger.Info("InputHandler close input ok")
+	logger.Debug("InputHandler close input ok")
 }
 
 func (h *InputHandler) closeOutputs() {
-	logger.Info("InputHandler close all outputs...")
+	logger.Debug("InputHandler close all outputs...")
 	wg := new(sync.WaitGroup)
 	for _, outputs := range h.outputs {
 		for _, output := range outputs {
@@ -108,5 +108,5 @@ func (h *InputHandler) closeOutputs() {
 		}
 	}
 	wg.Wait()
-	logger.Info("InputHandler close all outputs ok")
+	logger.Debug("InputHandler close all outputs ok")
 }

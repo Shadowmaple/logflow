@@ -29,7 +29,7 @@ func main() {
 	}
 
 	// init logger
-	logger.Init(conf.Logger)
+	logger.Init(conf.System.Logger)
 	defer logger.Sync()
 
 	// 用于接收退出信号
@@ -41,7 +41,7 @@ func main() {
 	go inputGroup.Start()
 
 	<-sigChan
-	logger.Info("Logflow received signal to exit")
+	logger.Debug("Logflow received signal to exit")
 	inputGroup.Close()
 	logger.Info("Logflow exit ok")
 }

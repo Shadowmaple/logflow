@@ -1,10 +1,14 @@
 package field_getter
 
 import (
+	"errors"
 	"regexp"
 
 	"github.com/Shadowmaple/logflow/internal/event"
 )
+
+var ErrNotFound = errors.New("field not found")
+var ErrInvalidType = errors.New("field is not a valid type")
 
 var matchp, matchESIndex, jsonPath *regexp.Regexp
 

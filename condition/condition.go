@@ -14,14 +14,14 @@ type ConditionFilter struct {
 	conditions []*conditionNode
 }
 
-func NewConditionFilter(conf map[string]any) *ConditionFilter {
+func NewConditionFilter(conf map[any]any) *ConditionFilter {
 	if conf == nil {
-		logger.Warn("condition filter config is nil")
+		logger.Error("condition filter config is nil")
 		return nil
 	}
 	entry, ok := conf["if"]
 	if !ok {
-		logger.Warn("condition filter config is missing if expression")
+		logger.Debug("condition filter config is missing if expression")
 		return nil
 	}
 

@@ -8,13 +8,13 @@ func TestMultiLevelFieldSetter_TwoLevels_CurrentBehavior(t *testing.T) {
 
 	f.SetField(ev, "hello")
 
-	got, ok := ev.Data["a"].(map[string]any)
+	got, ok := ev.Data["a"].(map[any]any)
 	if !ok {
-		t.Fatalf("a should be map[string]any, got %T", ev.Data["a"])
+		t.Fatalf("a should be map[any]any, got %T", ev.Data["a"])
 	}
-	inner, ok := got["b"].(map[string]any)
+	inner, ok := got["b"].(map[any]any)
 	if !ok {
-		t.Fatalf("a[b] should be map[string]any (bug: value nested one level too deep), got %T", got["b"])
+		t.Fatalf("a[b] should be map[any]any (bug: value nested one level too deep), got %T", got["b"])
 	}
 	if inner["b"] != "hello" {
 		t.Fatalf(`a[b][b] = %v, want %q`, inner["b"], "hello")
@@ -43,7 +43,7 @@ func TestMultiLevelFieldSetter_OverwriteFalse_SkipsLastField(t *testing.T) {
 	f.SetField(ev, "new")
 
 	// lastField "b" 在 Data["a"]["b"] 中已存在且 overwrite=false -> 不覆盖
-	got := ev.Data["a"].(map[string]any)["b"].(map[string]any)["b"]
+	got := ev.Data["a"].(map[any]any)["b"].(map[any]any)["b"]
 	if got != "old" {
 		t.Fatalf(`a[b][b] = %v, want %q (overwrite=false should skip)`, got, "old")
 	}
@@ -60,7 +60,7 @@ func TestMultiLevelFieldSetter_OverwriteTrue_OverwritesLastField(t *testing.T) {
 
 	f.SetField(ev, "new")
 
-	got := ev.Data["a"].(map[string]any)["b"].(map[string]any)["b"]
+	got := ev.Data["a"].(map[any]any)["b"].(map[any]any)["b"]
 	if got != "new" {
 		t.Fatalf(`a[b][b] = %v, want %q (overwrite=true should overwrite)`, got, "new")
 	}

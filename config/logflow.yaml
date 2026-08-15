@@ -1,6 +1,10 @@
 # 遇到错误是否丢弃消息
 # global:
 #   discard_on_error: true
+system:
+  worker: 1
+  logger:
+    level: 'debug'
 
 input:
   - kafka:
@@ -38,7 +42,7 @@ filter:
   - date:
       location: 'Asia/Shanghai'
       source: datatime
-      format: 'yyyy-MM-dd HH:mm:ss.SSS'
+      formats: ['yyyy-MM-dd HH:mm:ss.SSS']
       target: datatime
   - dateFormat:
       source: datatime
