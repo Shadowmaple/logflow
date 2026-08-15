@@ -19,6 +19,7 @@ import (
 type InputGroup []*InputHandler
 
 func BuildInputGroup(config *config.Config) InputGroup {
+	config.Worker = max(config.Worker, 1)
 	if len(config.Input) == 0 {
 		panic("no input config")
 	}
@@ -36,6 +37,7 @@ func BuildInputGroup(config *config.Config) InputGroup {
 }
 
 func (ig InputGroup) Start() {
+	logger.Info("InputGroup Start")
 	// wg := new(sync.WaitGroup)
 	for _, input := range ig {
 		// wg.Add(1)
@@ -74,11 +76,9 @@ func (ig InputGroup) Close() {
 	wg := new(sync.WaitGroup)
 	// 关闭input
 	for _, input := range ig {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			input.close()
-		}()
+		})
 	}
 	wg.Wait()
 	logger.Info("InputGroup Close ok")

@@ -30,13 +30,14 @@ type KafkaInputConfig struct {
 }
 
 type KafkaInput struct {
-	config         map[string]any
+	// config         map[any]any
 	decorateEvents bool
 	discardOnError bool // 遇到错误是否丢弃消息
 
 	ch       chan *event.Event
 	messages chan *sarama.ConsumerMessage
 	stop     bool
+	cancel   context.CancelFunc
 
 	decoder codec.Decoder
 
@@ -48,12 +49,12 @@ type KafkaInput struct {
 // 	DEFAULT_KAFKA_QUEUE_LEN = 256
 // )
 
-func newKafkaInputConfig(conf map[string]any) *KafkaInputConfig {
+func newKafkaInputConfig(conf map[any]any) *KafkaInputConfig {
 	c := &KafkaInputConfig{
 		codec:               "plain",
 		worker:              1,
 		decorateEvents:      true,
-		messagesQueueLength: 12,
+		messagesQueueLength: 8,
 		discardOnError:      false,
 	}
 
@@ -65,17 +66,35 @@ func newKafkaInputConfig(conf map[string]any) *KafkaInputConfig {
 	}
 
 	if v, ok := conf["topics"]; ok {
-		c.topics = v.([]string)
+		c.topics, ok = utils.ParseToStrList(v)
+		if !ok {
+			logger.Fatal("kafka input: parse config failed: invalid topics")
+		}
 	}
+	// TODO: 支持topic_pattern
 	if v, ok := conf["topic_pattern"]; ok {
-		c.topicPattern = v.(string)
+		c.topicPattern, ok = utils.ParseToStr(v)
+		if !ok {
+			logger.Fatal("kafka input: parse config failed: invalid topic_pattern")
+		}
+		logger.Fatal("kafka input: topic_pattern is not supported yet, please use topics")
 	}
 	if c.topicPattern == "" && len(c.topics) == 0 {
 		logger.Fatal("kafka input: parse config failed: topics or topic_pattern is required")
 	}
 
+	if v, ok := conf["codec"]; ok {
+		c.codec, ok = utils.ParseToStr(v)
+		if !ok {
+			logger.Fatal("kafka input: parse config failed: invalid codec")
+		}
+	}
+
 	if v, ok := conf["group_id"]; ok {
-		c.groupID = v.(string)
+		c.groupID, ok = utils.ParseToStr(v)
+		if !ok {
+			logger.Fatal("kafka input: parse config failed: invalid group_id")
+		}
 	} else {
 		logger.Fatal("kafka input: parse config failed: group_id is required")
 	}
@@ -110,6 +129,7 @@ func newKafkaInputConfig(conf map[string]any) *KafkaInputConfig {
 
 	// 初始化sarama客户端配置
 	clientConfig := sarama.NewConfig()
+	clientConfig.ClientID = "logflow"
 
 	if v, ok := conf["from_beginning"]; ok {
 		fromBeginning, ok := utils.ParseToBool(v)
@@ -150,17 +170,25 @@ func newKafkaInputConfig(conf map[string]any) *KafkaInputConfig {
 		}
 		clientConfig.Net.SASL.Enable = saslEnable
 		if saslEnable {
-			clientConfig.Net.SASL.User = conf["sasl_username"].(string)
-			clientConfig.Net.SASL.Password = conf["sasl_password"].(string)
-			if clientConfig.Net.SASL.User == "" || clientConfig.Net.SASL.Password == "" {
+			clientConfig.Net.SASL.User, ok = utils.ParseToStr(conf["sasl_username"])
+			clientConfig.Net.SASL.Password, ok = utils.ParseToStr(conf["sasl_password"])
+			if !ok || clientConfig.Net.SASL.User == "" || clientConfig.Net.SASL.Password == "" {
 				logger.Fatal("kafka input: parse config failed: invalid sasl_username and sasl_password")
 			}
-			clientConfig.Net.SASL.Mechanism = sarama.SASLMechanism(conf["sasl_mechanism"].(string))
+			saslMechanism, ok := utils.ParseToStr(conf["sasl_mechanism"])
+			if !ok {
+				logger.Fatal("kafka input: parse config failed: invalid sasl_mechanism")
+			}
+			clientConfig.Net.SASL.Mechanism = sarama.SASLMechanism(saslMechanism)
 		}
 	}
 
 	if v, ok := conf["version"]; ok {
-		kafkaVersionn, err := sarama.ParseKafkaVersion(v.(string))
+		version, ok := utils.ParseToStr(v)
+		if !ok {
+			logger.Fatal("kafka input: parse config failed: invalid version")
+		}
+		kafkaVersionn, err := sarama.ParseKafkaVersion(version)
 		if err != nil {
 			logger.Fatal("kafka input: parse config failed: invalid version", zap.Error(err))
 		}
@@ -168,9 +196,10 @@ func newKafkaInputConfig(conf map[string]any) *KafkaInputConfig {
 	}
 
 	if v, ok := conf["client_id"]; ok {
-		clientConfig.ClientID = v.(string)
-	} else {
-		clientConfig.ClientID = "logflow"
+		clientConfig.ClientID, ok = utils.ParseToStr(v)
+		if !ok {
+			logger.Fatal("kafka input: parse config failed: invalid client_id")
+		}
 	}
 
 	// 消费者超时设置
@@ -185,21 +214,21 @@ func newKafkaInputConfig(conf map[string]any) *KafkaInputConfig {
 	return c
 }
 
-func newKafkaInput(conf map[string]any) model.Input {
+func newKafkaInput(conf map[any]any) model.Input {
 	// 解析config
 	config := newKafkaInputConfig(conf)
+	ctx, cancel := context.WithCancel(context.TODO())
+
 	kafkaInput := &KafkaInput{
-		config:         conf,
+		// config:         conf,
 		decorateEvents: config.decorateEvents,
 		discardOnError: config.discardOnError,
 		ch:             make(chan *event.Event, config.messagesQueueLength),
+		cancel:         cancel,
 		messages:       make(chan *sarama.ConsumerMessage, config.messagesQueueLength),
 		groupConsumers: make([]*sarama.ConsumerGroup, config.worker),
 		decoder:        codec.NewDecoder(config.codec),
 	}
-
-	ctx, cancel := context.WithCancel(context.TODO())
-	defer cancel()
 
 	for i := 0; i < config.worker; i++ {
 		// 创建消费者组
@@ -232,8 +261,8 @@ func newKafkaInput(conf map[string]any) model.Input {
 					}
 					logger.Error("kafka input: consume process err, will retry", zap.Error(err))
 					// 发生错误时等待一段时间再重试
-					// TODO: 随机时间
-					time.Sleep(5 * time.Second)
+					// TODO: 随机时间间隔
+					time.Sleep(3 * time.Second)
 				}
 			}
 		}()
@@ -243,9 +272,9 @@ func newKafkaInput(conf map[string]any) model.Input {
 }
 
 // receive events
-func (ki *KafkaInput) Receive() <-chan *event.Event {
-	return ki.ch
-}
+// func (ki *KafkaInput) Receive() <-chan *event.Event {
+// 	return ki.ch
+// }
 
 // receive events
 func (ki *KafkaInput) ReceiveOne() *event.Event {
@@ -269,28 +298,23 @@ func (ki *KafkaInput) ReceiveOne() *event.Event {
 		)
 		if len(msg.Value) == 0 {
 			logger.Warn("kafka input: msg value is nil", zap.String("topic", msg.Topic))
-			// continue
+			continue
 		}
 
 		data, err := ki.decoder.Decode(msg.Value)
-		if err != nil || data == nil {
-			logger.Error("kafka input: decoded msg failed: "+string(msg.Value), zap.Error(err))
+		if err != nil {
+			logger.Error("kafka input: decoded msg failed. ", zap.Error(err), zap.String("msg", string(msg.Value)))
 			if ki.discardOnError {
 				continue
 			}
-			data = map[string]any{
-				"message": string(msg.Value),
-				"_error":  err.Error(),
-			}
 		}
 		if ki.decorateEvents {
-			kafkaMeta := map[string]any{
+			data["@metadata"] = map[string]any{"kafka": map[string]any{
 				"topic":     msg.Topic,
 				"partition": msg.Partition,
 				"offset":    msg.Offset,
-				// "timestamp": msg.Timestamp,
-			}
-			data["@metadata"] = map[string]any{"kafka": kafkaMeta}
+				"timestamp": msg.Timestamp,
+			}}
 		}
 		return &event.Event{
 			Data: data,
@@ -300,8 +324,11 @@ func (ki *KafkaInput) ReceiveOne() *event.Event {
 	return nil
 }
 
+// Close 关闭KafkaInput，释放所有资源
 func (ki *KafkaInput) Close() {
+	logger.Info("kafka input: Close...")
 	ki.stop = true
+	ki.cancel()
 	for _, c := range ki.groupConsumers {
 		if err := (*c).Close(); err != nil {
 			logger.Error("kafka input: groupConsumers closing failed", zap.Error(err))
@@ -313,7 +340,7 @@ func (ki *KafkaInput) Close() {
 // Setup 在消费者组开始消费前调用，用于初始化
 func (k *KafkaInput) Setup(session sarama.ConsumerGroupSession) error {
 	logger.Info("kafka input: consumer group setup")
-	fmt.Println("session:", session.MemberID(), session.Claims())
+	logger.Debug(fmt.Sprintf("kafka input: session %s, claims %v", session.MemberID(), session.Claims()))
 	return nil
 }
 
@@ -328,55 +355,18 @@ func (k *KafkaInput) ConsumeClaim(session sarama.ConsumerGroupSession, claim sar
 	logger.Info("kafka input: consumer start")
 	// 从claim的Messages()通道中读取消息
 	for msg := range claim.Messages() {
-		k.messages <- msg
-		// logger.Debug(
-		// 	fmt.Sprintf("kafka input: 主题: %s, 分区: %d, 偏移量: %d, 时间戳: %v, 消息内容: %s",
-		// 		msg.Topic,
-		// 		msg.Partition,
-		// 		msg.Offset,
-		// 		msg.Timestamp,
-		// 		string(msg.Value),
-		// 	),
-		// )
-		// if len(msg.Value) == 0 {
-		// 	logger.Error("kafka input: msg value is nil", zap.String("topic", msg.Topic))
-		// 	continue
-		// }
-
-		// data, err := k.decoder.Decode(msg.Value)
-		// if err != nil || data == nil {
-		// 	logger.Error("kafka input: decoded msg failed: "+string(msg.Value), zap.Error(err))
-		// 	if k.discardOnError {
-		// 		continue
-		// 	}
-		// 	data = map[string]any{
-		// 		"message": string(msg.Value),
-		// 		"_error":  err.Error(),
-		// 	}
-		// }
-
-		// if k.decorateEvents {
-		// 	data["_kafka"] = map[string]any{
-		// 		"topic":     msg.Topic,
-		// 		"partition": msg.Partition,
-		// 		"offset":    msg.Offset,
-		// 		"timestamp": msg.Timestamp,
-		// 	}
-		// 	// kafkaMeta := make(map[string]any)
-		// 	// kafkaMeta["topic"] = message.TopicName
-		// 	// kafkaMeta["partition"] = message.PartitionID
-		// 	// kafkaMeta["offset"] = message.Message.Offset
-		// 	// event["@metadata"] = map[string]any{"kafka": kafkaMeta}
-		// }
-
-		// k.ch <- &event.Event{
-		// 	Data: data,
-		// 	Time: time.Now(),
-		// }
-
+		select {
+		case k.messages <- msg:
+		case <-session.Context().Done():
+			return nil
+		}
 		// 手动提交偏移量，标记消息已处理
 		// 注意：在生产环境中，应确保消息真正处理完成后再提交偏移量
 		// session.MarkMessage(msg, "")
 	}
 	return nil
+}
+
+func init() {
+	Register("kafka", newKafkaInput)
 }

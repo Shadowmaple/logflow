@@ -1,6 +1,7 @@
 package process
 
 import (
+	"strconv"
 	"sync"
 
 	"github.com/Shadowmaple/logflow/filter"
@@ -41,6 +42,8 @@ func (h *InputHandler) start() {
 // StartOne 启动一个处理任务
 // 执行不退出，不断从 input 接收事件，经过 filter 处理后发送到 output
 func (h *InputHandler) startOne(id int) {
+	logger.Info("InputHandler startOne " + strconv.Itoa(id))
+
 	// build filter, output processors
 	filters := model.BuildFilterProcessors(h.config.Filter, filter.BuildFilter)
 	outputs := BuildOutputProcessors(h.config.Output)
@@ -57,6 +60,7 @@ func (h *InputHandler) startOne(id int) {
 	for _, output := range outputs {
 		processor = model.AppendProcessors(processor, output)
 	}
+	logger.Info("InputHandler startOne " + strconv.Itoa(id) + " processors build ok")
 
 	// 处理事件
 	for !h.stop {
@@ -68,6 +72,7 @@ func (h *InputHandler) startOne(id int) {
 		processor.Process(event)
 	}
 
+	logger.Info("InputHandler startOne gets close signal and quickly receives all events")
 	// 快速将未消费完的事件发送到下一个处理线程
 	// TODO: 如果es集群挂了，链路一直卡住，那就一直无法关闭
 	wg := new(sync.WaitGroup)
@@ -76,30 +81,30 @@ func (h *InputHandler) startOne(id int) {
 		if event == nil {
 			break
 		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			processor.Process(event)
-		}()
+		})
 	}
 	wg.Wait()
+	logger.Info("InputHandler startOne quickly receives all events ok")
 }
 
 func (h *InputHandler) close() {
+	logger.Info("InputHandler close input...")
 	h.stop = true
 	h.input.Close()
 	h.closeOutputs()
+	logger.Info("InputHandler close input ok")
 }
 
 func (h *InputHandler) closeOutputs() {
+	logger.Info("InputHandler close all outputs...")
 	wg := new(sync.WaitGroup)
 	for _, outputs := range h.outputs {
 		for _, output := range outputs {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				output.Close()
-			}()
+			})
 		}
 	}
 	wg.Wait()

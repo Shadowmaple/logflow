@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Shadowmaple/logflow/field/field_getter"
 	"github.com/Shadowmaple/logflow/field/field_setter"
 	"github.com/Shadowmaple/logflow/internal/event"
 	"github.com/Shadowmaple/logflow/internal/utils"
 	"github.com/Shadowmaple/logflow/model"
-	"github.com/Shadowmaple/logflow/render"
 
 	"github.com/relvacode/iso8601"
 )
@@ -176,7 +176,7 @@ type DateFilter struct {
 	dateParsers  []DateParser
 	overwrite    bool
 	source       string
-	sourceRender render.Render
+	sourceFieldGetter field_getter.FieldGetter
 	target       string
 	targetSetter field_setter.FieldSetter
 }
@@ -210,7 +210,7 @@ func newDateFilter(config map[string]any) model.Filter {
 
 	plugin.overwrite = dateConfig.Overwrite
 	plugin.source = dateConfig.Source
-	plugin.sourceRender = render.GetRender(plugin.source)
+	plugin.sourceFieldGetter = field_getter.GetFieldGetter(plugin.source)
 	plugin.target = dateConfig.Target
 	plugin.targetSetter = field_setter.NewFieldSetter(plugin.target, plugin.overwrite)
 
@@ -234,7 +234,7 @@ func newDateFilter(config map[string]any) model.Filter {
 
 func (f *DateFilter) Filter(event *event.Event) (*event.Event, error) {
 	// 从源字段读取值
-	sourceValue, err := f.sourceRender.Render(event)
+	sourceValue, err := f.sourceFieldGetter.GetField(event)
 	if err != nil || sourceValue == nil {
 		return event, errors.New("date filter failed: get value failed")
 	}

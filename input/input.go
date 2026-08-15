@@ -1,17 +1,27 @@
 package input
 
-import "github.com/Shadowmaple/logflow/model"
+import (
+	"github.com/Shadowmaple/logflow/internal/logger"
+	"github.com/Shadowmaple/logflow/model"
+)
+
+type InputHander func(conf map[any]any) model.Input
+
+var inputHandlers = make(map[string]InputHander)
+
+func Register(name string, f InputHander) {
+	inputHandlers[name] = f
+}
 
 func NewInput(conf map[string]any) model.Input {
 	if conf == nil {
 		panic("input config is nil")
 	}
 	for k, v := range conf {
-		switch k {
-		case "kafka":
-			return newKafkaInput(v.(map[string]any))
+		if handler, ok := inputHandlers[k]; ok {
+			return handler(v.(map[any]any))
 		}
-		panic("invalid input type: " + k)
+		logger.Fatal("invalid input type: " + k)
 	}
 	return nil
 }

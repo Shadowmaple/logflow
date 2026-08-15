@@ -1,4 +1,4 @@
-package render
+package field_getter
 
 import (
 	"fmt"
@@ -8,18 +8,18 @@ import (
 )
 
 // JSON 路径解析器，如 $.data.name
-type JsonpathRender struct {
+type JsonpathFieldGetter struct {
 	Pat *jsonpath.Compiled
 }
 
-func newJsonpathRender(path string) *JsonpathRender {
+func newJsonpathFieldGetter(path string) *JsonpathFieldGetter {
 	pat, err := jsonpath.Compile(path)
 	if err != nil {
 		panic(fmt.Sprintf("json path compile `%s` error: %s", path, err))
 	}
-	return &JsonpathRender{Pat: pat}
+	return &JsonpathFieldGetter{Pat: pat}
 }
 
-func (r *JsonpathRender) Render(event *event.Event) (any, error) {
+func (r *JsonpathFieldGetter) GetField(event *event.Event) (any, error) {
 	return r.Pat.Lookup(event.Data)
 }

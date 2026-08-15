@@ -1,4 +1,4 @@
-package render
+package field_getter
 
 import (
 	"fmt"
@@ -11,15 +11,15 @@ import (
 type field struct {
 	literal bool // 是否为字面量，即不需要赋值
 	value   string
-	mu      *MultiLevelRender // 多层级解析器，如[@metadata][kafka][topic]
+	mu      *MultiLevelFieldGetter // 多层级解析器，如[@metadata][kafka][topic]
 }
 
-func (f *field) render(event *event.Event) (string, error) {
+func (f *field) getField(event *event.Event) (string, error) {
 	if f.literal {
 		return f.value, nil
 	}
 	if f.mu != nil {
-		val, err := f.mu.Render(event)
+		val, err := f.mu.GetField(event)
 		if err != nil {
 			return "", err
 		}
@@ -28,10 +28,10 @@ func (f *field) render(event *event.Event) (string, error) {
 	if val, ok := event.Data[f.value]; ok {
 		return val.(string), nil
 	}
-	return "", fmt.Errorf("index render failed, %s not found", f.value)
+	return "", fmt.Errorf("index fieldgetter failed, %s not found", f.value)
 }
 
-func newIndexRender(template string) *IndexRender {
+func newIndexFieldGetter(template string) *IndexFieldGetter {
 	r, _ := regexp.Compile(`%{(.+?)}`)
 	fields := make([]*field, 0)
 	lastIdx := 0
@@ -49,7 +49,7 @@ func newIndexRender(template string) *IndexRender {
 			fields = append(fields, &field{
 				literal: false,
 				value:   val,
-				mu:      newMultiLevelRender(getAllFields(val)),
+				mu:      newMultiLevelFieldGetter(getAllFields(val)),
 			})
 		} else {
 			fields = append(fields, &field{
@@ -65,7 +65,7 @@ func newIndexRender(template string) *IndexRender {
 			value:   template[lastIdx:],
 		})
 	}
-	return &IndexRender{fields: fields}
+	return &IndexFieldGetter{fields: fields}
 }
 
 // getAllFields ("%{[@metadata][kafka][topic]}") => ["@metadata","kafka","topic"]
@@ -78,14 +78,14 @@ func getAllFields(s string) []string {
 	return fields
 }
 
-type IndexRender struct {
+type IndexFieldGetter struct {
 	fields []*field
 }
 
-func (r *IndexRender) Render(event *event.Event) (any, error) {
+func (r *IndexFieldGetter) GetField(event *event.Event) (any, error) {
 	values := make([]string, 0, len(r.fields))
 	for _, f := range r.fields {
-		val, err := f.render(event)
+		val, err := f.getField(event)
 		if err != nil {
 			return "", err
 		}

@@ -3,9 +3,14 @@ package output
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"net"
+	"net/http"
 	"os"
+	"sync"
 	"time"
 
+	"github.com/Shadowmaple/logflow/field/field_getter"
 	"github.com/Shadowmaple/logflow/internal/event"
 	"github.com/Shadowmaple/logflow/internal/logger"
 	"github.com/Shadowmaple/logflow/internal/utils"
@@ -15,9 +20,14 @@ import (
 	"go.uber.org/zap"
 )
 
+func init() {
+	Register("elasticsearch", newElasticsearchOutput)
+}
+
 type ElasticsearchOutput struct {
-	config        map[string]any
+	// config        map[any]any
 	index         string
+	indexFG       field_getter.FieldGetter
 	hosts         []string
 	user          string
 	password      string
@@ -29,77 +39,95 @@ type ElasticsearchOutput struct {
 	sniffInterval int
 	maxRetries    int // 最大重试次数，默认 3 次
 
-	client *elasticsearch.Client
+	client  *elasticsearch.Client
+	bufPool sync.Pool
 }
 
-func newElasticsearchOutput(config map[string]any) model.Output {
-	if config == nil {
-		logger.Fatal("Elasticsearch config is nil")
+// newElasticsearchConfig 解析配置，返回 ElasticsearchOutput（不含 client）和 elasticsearch.Config。
+// 不涉及文件 IO 和网络连接，可在单元测试中直接调用。
+func newElasticsearchConfig(conf map[any]any) (*ElasticsearchOutput, elasticsearch.Config) {
+	if conf == nil {
+		logger.Fatal("elasticsearch output: config is nil")
 	}
 	e := &ElasticsearchOutput{
-		config:     config,
+		// config:     conf,
 		ssl:        false,
 		version:    7,
 		sniff:      false,
 		maxRetries: 3,
+		bufPool: sync.Pool{
+			New: func() any {
+				return new(bytes.Buffer)
+			},
+		},
 	}
-	if v, ok := config["index"]; ok {
-		e.index = utils.TrimStr(v.(string))
-	}
-	if v, ok := config["hosts"]; ok {
-		e.hosts, ok = utils.ParseToStrList(v)
-		if !ok {
-			logger.Fatal("Elasticsearch hosts config must be a list of strings")
+	if v, ok := conf["index"]; ok {
+		if e.index, ok = utils.ParseToStr(v); !ok {
+			logger.Fatal("elasticsearch output: index must be a string")
 		}
 	} else {
-		logger.Fatal("Elasticsearch hosts config is required")
+		logger.Fatal("elasticsearch output: index config is required")
 	}
-	if v, ok := config["user"]; ok {
-		e.user = utils.TrimStr(v.(string))
+	e.indexFG = field_getter.GetFieldGetter2(e.index)
+
+	if v, ok := conf["hosts"]; ok {
+		e.hosts, ok = utils.ParseToStrList(v)
+		if !ok {
+			logger.Fatal("elasticsearch output hosts config must be a list of strings")
+		}
+	} else {
+		logger.Fatal("elasticsearch output hosts config is required")
 	}
-	if v, ok := config["password"]; ok {
-		e.password = utils.TrimStr(v.(string))
+	if v, ok := conf["user"]; ok {
+		if e.user, ok = utils.ParseToStr(v); !ok {
+			logger.Fatal("elasticsearch output: user must be a string")
+		}
 	}
-	if v, ok := config["ssl"]; ok {
+	if v, ok := conf["password"]; ok {
+		if e.password, ok = utils.ParseToStr(v); !ok {
+			logger.Fatal("elasticsearch output: password must be a string")
+		}
+	}
+	if v, ok := conf["ssl"]; ok {
 		e.ssl, ok = utils.ParseToBool(v)
 		if !ok {
-			logger.Fatal("Elasticsearch ssl config must be a boolean value")
+			logger.Fatal("elasticsearch output: ssl config must be a boolean value")
 		}
 	}
 	if e.ssl {
-		if v, ok := config["cacert"]; ok {
-			e.cacert = utils.TrimStr(v.(string))
-		} else if e.ssl {
-			logger.Fatal("Elasticsearch cacert config is required")
+		if v, ok := conf["cacert"]; ok {
+			if e.cacert, ok = utils.ParseToStr(v); !ok {
+				logger.Fatal("elasticsearch output: cacert config must be a string")
+			}
+		} else {
+			logger.Fatal("elasticsearch output: cacert config is required")
 		}
 	}
-	if v, ok := config["api_key"]; ok {
-		e.apiKey = utils.TrimStr(v.(string))
+	if v, ok := conf["api_key"]; ok {
+		if e.apiKey, ok = utils.ParseToStr(v); !ok {
+			logger.Fatal("elasticsearch output: api_key must be a string")
+		}
 	}
-	if v, ok := config["sniff"]; ok {
-		e.sniff, ok = utils.ParseToBool(v)
-		if !ok {
-			logger.Fatal("Elasticsearch sniff config must be a boolean value")
+	if v, ok := conf["sniff"]; ok {
+		if e.sniff, ok = utils.ParseToBool(v); !ok {
+			logger.Fatal("elasticsearch output: sniff config must be a boolean value")
 		}
 	}
 	if e.sniff {
-		if v, ok := config["sniff_interval"]; ok {
-			e.sniffInterval, ok = utils.ParseToInt(v)
-			if !ok || e.sniffInterval < 0 {
-				logger.Fatal("Elasticsearch sniff_interval config must be greater than or equal to 0")
+		if v, ok := conf["sniff_interval"]; ok {
+			if e.sniffInterval, ok = utils.ParseToInt(v); !ok || e.sniffInterval < 0 {
+				logger.Fatal("elasticsearch output: sniff_interval config must be greater than or equal to 0")
 			}
 		} else {
 			e.sniffInterval = 30
 		}
 	}
-	if v, ok := config["max_retries"]; ok {
-		e.maxRetries, ok = utils.ParseToInt(v)
-		if !ok || e.maxRetries < 0 {
-			logger.Fatal("Elasticsearch max_retries config must be greater than or equal to 0")
+	if v, ok := conf["max_retries"]; ok {
+		if e.maxRetries, ok = utils.ParseToInt(v); !ok || e.maxRetries < 0 {
+			logger.Fatal("elasticsearch output: max_retries config must be greater than or equal to 0")
 		}
 	}
 
-	var err error
 	clientConfig := elasticsearch.Config{
 		Addresses:            e.hosts,
 		Username:             e.user,
@@ -108,72 +136,89 @@ func newElasticsearchOutput(config map[string]any) model.Output {
 		DisableRetry:         e.maxRetries == 0,
 		MaxRetries:           e.maxRetries,
 		DiscoverNodesOnStart: e.sniff,
+		Transport: &http.Transport{
+			ResponseHeaderTimeout: 10 * time.Second,
+			DialContext: (&net.Dialer{
+				Timeout: 5 * time.Second,
+			}).DialContext,
+		},
 	}
 
 	if e.sniff {
 		clientConfig.DiscoverNodesInterval = time.Duration(e.sniffInterval) * time.Second
 	}
 
+	return e, clientConfig
+}
+
+func newElasticsearchOutput(config map[any]any) model.Output {
+	e, clientConfig := newElasticsearchConfig(config)
+
+	var err error
 	if e.ssl {
 		// 根据路径加载证书文件
 		if clientConfig.CACert, err = os.ReadFile(e.cacert); err != nil {
-			logger.Fatal("Failed to read Elasticsearch CACert file:"+e.cacert, zap.Error(err))
+			logger.Fatal("elasticsearch output: Failed to read Elasticsearch CACert file:"+e.cacert, zap.Error(err))
 		}
 	}
 
 	e.client, err = elasticsearch.NewClient(clientConfig)
 	if err != nil {
-		logger.Fatal("Failed to create Elasticsearch client", zap.Error(err))
+		logger.Fatal("elasticsearch output: Failed to create Elasticsearch client", zap.Error(err))
 	}
 
 	// 检查 Elasticsearch 连接是否成功
-	// if res, err := e.client.Ping(); err != nil {
-	// 	logger.Fatal("Failed to ping Elasticsearch", zap.Error(err))
-	// } else if res.IsError() {
-	// 	logger.Fatal("Failed to ping Elasticsearch", zap.String("body", res.String()))
-	// }
 	res, err := e.client.Info()
 	if err != nil {
-		logger.Fatal("Failed to get Elasticsearch info", zap.Error(err))
+		logger.Fatal("elasticsearch output: Failed to get Elasticsearch info", zap.Error(err))
 	}
 	defer res.Body.Close()
 	if res.IsError() {
-		logger.Fatal("Failed to get Elasticsearch info", zap.String("body", res.String()))
+		logger.Fatal("elasticsearch output: Failed to get Elasticsearch info", zap.String("body", res.String()))
 	}
-	logger.Info("Connected to Elasticsearch", zap.String("body", res.String()))
+	logger.Info("elasticsearch output: Connected to Elasticsearch", zap.String("body", res.String()))
 
 	return e
 }
 
 func (e *ElasticsearchOutput) Handle(event *event.Event) error {
+	// 根据index格式和消息，生成需写入的index，获取失败则默认为字面量
+	var index = e.index
+	indexAny, err := e.indexFG.GetField(event)
+	if err != nil {
+		logger.Error("elasticsearch output: Failed to get index from event", zap.Error(err))
+	} else if indexStr, ok := indexAny.(string); ok {
+		index = indexStr
+	}
 
-	// TODO: 根据index格式和消息，生成需写入的index
-	index := ""
+	// 将 map 序列化为 JSON（复用 sync.Pool 中的 bytes.Buffer）
+	buf := e.bufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer e.bufPool.Put(buf)
 
-	// 将 map 序列化为 JSON
-	// TODO: 复用buf
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(event.Data); err != nil {
-		logger.Error("Failed to encode event data to JSON", zap.Error(err))
+	if err = json.NewEncoder(buf).Encode(event.Data); err != nil {
+		logger.Error("elasticsearch output: Failed to encode event data to JSON", zap.Error(err))
 		return err
 	}
 
 	// TODO: 写入失败后将数据存入失败队列，不断重试。（待定：持久化到磁盘，避免重启导致数据丢失）
 	// 写入事件到 Elasticsearch
-	res, err := e.client.Index(index, &buf)
+	res, err := e.client.Index(index, buf)
 	if err != nil {
-		logger.Error("Failed to index event to Elasticsearch", zap.Error(err))
+		logger.Error("elasticsearch output: Failed to index event to Elasticsearch", zap.Error(err))
 		return err
 	}
 	defer res.Body.Close()
 	if res.IsError() {
-		logger.Error("Failed to index event to Elasticsearch", zap.String("resp", res.String()))
-		return err
+		logger.Error("elasticsearch output: Failed to index event to Elasticsearch",
+			zap.String("resp", res.String()))
+		return fmt.Errorf("elasticsearch index failed: %s", res.Status())
 	}
-	logger.Debug("Indexed event to Elasticsearch", zap.String("resp", res.String()))
+	logger.Debug("elasticsearch output: Indexed event to Elasticsearch", zap.String("resp", res.String()))
 	return nil
 }
 
 func (e *ElasticsearchOutput) Close() {
 	// 客户端不是长连接，不需要关闭
+	logger.Info("elasticsearch output Close ok")
 }
