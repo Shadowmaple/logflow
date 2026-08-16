@@ -58,6 +58,12 @@ func ParseToStrList(value any) ([]string, bool) {
 			list[i] = TrimStr(str)
 		}
 		return list, true
+	case []any:
+		list := make([]string, len(v))
+		for i, item := range v {
+			list[i] = TrimStr(item.(string))
+		}
+		return list, true
 	case []string:
 		return v, true
 	}
