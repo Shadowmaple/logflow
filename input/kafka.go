@@ -2,6 +2,7 @@ package input
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/Shadowmaple/logflow/model"
 
 	"github.com/IBM/sarama"
+	"github.com/xdg-go/scram"
 	"go.uber.org/zap"
 )
 
@@ -45,99 +47,120 @@ type KafkaInput struct {
 	groupConsumers []*sarama.ConsumerGroup
 }
 
-// const (
-// 	DEFAULT_KAFKA_QUEUE_LEN = 256
-// )
+const DEFAULT_KAFKA_QUEUE_LEN = 8
 
 func newKafkaInputConfig(conf map[any]any) *KafkaInputConfig {
 	c := &KafkaInputConfig{
 		codec:               "plain",
 		worker:              1,
 		decorateEvents:      true,
-		messagesQueueLength: 8,
+		messagesQueueLength: DEFAULT_KAFKA_QUEUE_LEN,
 		discardOnError:      false,
 	}
 
 	if v, ok := conf["brokers"]; ok {
 		c.brokers, ok = utils.ParseToStrList(v)
 		if !ok {
-			logger.Fatal("kafka input: parse config failed: invalid brokers")
+			// logger.Fatal("kafka input: parse config failed: invalid brokers")
+			panic("kafka input: parse config failed: invalid brokers")
 		}
+	} else {
+		panic("kafka input: parse config failed: brokers is required")
 	}
 
 	if v, ok := conf["topics"]; ok {
 		c.topics, ok = utils.ParseToStrList(v)
 		if !ok {
-			logger.Fatal("kafka input: parse config failed: invalid topics")
+			// logger.Fatal("kafka input: parse config failed: invalid topics")
+			panic("kafka input: parse config failed: invalid topics")
 		}
 	}
 	// TODO: 支持topic_pattern
 	if v, ok := conf["topic_pattern"]; ok {
 		c.topicPattern, ok = utils.ParseToStr(v)
 		if !ok {
-			logger.Fatal("kafka input: parse config failed: invalid topic_pattern")
+			// logger.Fatal("kafka input: parse config failed: invalid topic_pattern")
+			panic("kafka input: parse config failed: invalid topic_pattern")
 		}
-		logger.Fatal("kafka input: topic_pattern is not supported yet, please use topics")
+		logger.Warn("kafka input: topic_pattern is not supported yet, please use topics")
 	}
 	if c.topicPattern == "" && len(c.topics) == 0 {
-		logger.Fatal("kafka input: parse config failed: topics or topic_pattern is required")
+		// logger.Fatal("kafka input: parse config failed: topics or topic_pattern is required")
+		panic("kafka input: parse config failed: topics or topic_pattern is required")
 	}
 
 	if v, ok := conf["codec"]; ok {
 		c.codec, ok = utils.ParseToStr(v)
 		if !ok {
-			logger.Fatal("kafka input: parse config failed: invalid codec")
+			// logger.Fatal("kafka input: parse config failed: invalid codec")
+			panic("kafka input: parse config failed: invalid codec")
 		}
 	}
 
 	if v, ok := conf["group_id"]; ok {
 		c.groupID, ok = utils.ParseToStr(v)
 		if !ok {
-			logger.Fatal("kafka input: parse config failed: invalid group_id")
+			// logger.Fatal("kafka input: parse config failed: invalid group_id")
+			panic("kafka input: parse config failed: invalid group_id")
 		}
 	} else {
-		logger.Fatal("kafka input: parse config failed: group_id is required")
+		// logger.Fatal("kafka input: parse config failed: group_id is required")
+		panic("kafka input: parse config failed: group_id is required")
 	}
 
 	if v, ok := conf["worker"]; ok {
 		c.worker, ok = utils.ParseToInt(v)
 		if !ok || c.worker <= 0 {
-			logger.Fatal("kafka input: parse config failed: invalid worker")
+			// logger.Fatal("kafka input: parse config failed: invalid worker")
+			panic("kafka input: parse config failed: invalid worker")
 		}
 	}
 
 	if v, ok := conf["discard_on_error"]; ok {
 		c.discardOnError, ok = utils.ParseToBool(v)
 		if !ok {
-			logger.Fatal("kafka input: parse config failed: invalid discard_on_error")
+			// logger.Fatal("kafka input: parse config failed: invalid discard_on_error")
+			panic("kafka input: parse config failed: invalid discard_on_error")
 		}
 	}
 
 	if v, ok := conf["decorate_events"]; ok {
 		c.decorateEvents, ok = utils.ParseToBool(v)
 		if !ok {
-			logger.Fatal("kafka input: parse config failed: invalid decorate_events")
+			// logger.Fatal("kafka input: parse config failed: invalid decorate_events")
+			panic("kafka input: parse config failed: invalid decorate_events")
 		}
 	}
 
 	if v, ok := conf["messages_queue_length"]; ok {
 		c.messagesQueueLength, ok = utils.ParseToInt(v)
 		if !ok || c.messagesQueueLength <= 0 {
-			logger.Fatal("kafka input: parse config failed: invalid messages_queue_length")
+			// logger.Fatal("kafka input: parse config failed: invalid messages_queue_length")
+			panic("kafka input: parse config failed: invalid messages_queue_length")
 		}
 	}
 
 	// 初始化sarama客户端配置
+	c.clientConfig = getConsumerConfig(conf)
+	return c
+}
+
+// 初始化sarama客户端配置
+func getConsumerConfig(conf map[any]any) *sarama.Config {
 	clientConfig := sarama.NewConfig()
 	clientConfig.ClientID = "logflow"
+	clientConfig.Consumer.Offsets.Initial = sarama.OffsetNewest
+	clientConfig.Consumer.Offsets.AutoCommit.Enable = true
+	clientConfig.Consumer.Offsets.AutoCommit.Interval = time.Second * 15
 
-	if v, ok := conf["from_beginning"]; ok {
-		fromBeginning, ok := utils.ParseToBool(v)
+	if v, ok := conf["auto_offset_earliest"]; ok {
+		autoOffsetEarliest, ok := utils.ParseToBool(v)
 		if !ok {
-			logger.Fatal("kafka input: parse config failed: invalid from_beginning")
+			// logger.Fatal("kafka input: parse config failed: invalid auto_offset_earliest")
+			panic("kafka input: parse config failed: invalid auto_offset_earliest")
 		}
 		// 当消费者组第一次消费时，从哪个位置开始消费
-		if fromBeginning {
+		if autoOffsetEarliest {
 			clientConfig.Consumer.Offsets.Initial = sarama.OffsetOldest
 		} else {
 			clientConfig.Consumer.Offsets.Initial = sarama.OffsetNewest
@@ -148,45 +171,91 @@ func newKafkaInputConfig(conf map[any]any) *KafkaInputConfig {
 	if v, ok := conf["enable_auto_commit"]; ok {
 		enableAutoCommit, ok := utils.ParseToBool(v)
 		if !ok {
-			logger.Fatal("kafka input: parse config failed: invalid enable_auto_commit")
+			// logger.Fatal("kafka input: parse config failed: invalid enable_auto_commit")
+			panic("kafka input: parse config failed: invalid enable_auto_commit")
 		}
 		clientConfig.Consumer.Offsets.AutoCommit.Enable = enableAutoCommit
 	}
 
-	// 提交偏移量的时间间隔
-	if v, ok := conf["commit_interval"]; ok {
-		commitInterval, ok := utils.ParseToInt(v)
-		if !ok || commitInterval <= 0 {
-			logger.Fatal("kafka input: parse config failed: invalid commit_interval")
+	// 自动提交偏移量的时间间隔(秒)
+	if clientConfig.Consumer.Offsets.AutoCommit.Enable {
+		if v, ok := conf["auto_commit_interval"]; ok {
+			autoCommitInterval, ok := utils.ParseToInt(v)
+			if !ok || autoCommitInterval <= 0 {
+				// logger.Fatal("kafka input: parse config failed: invalid auto_commit_interval")
+				panic("kafka input: parse config failed: invalid auto_commit_interval")
+			}
+			clientConfig.Consumer.Offsets.AutoCommit.Interval = time.Duration(autoCommitInterval) * time.Second
 		}
-		clientConfig.Consumer.Offsets.AutoCommit.Interval = time.Duration(commitInterval) * time.Second
 	}
 
 	// 配置SASL认证
-	if v, ok := conf["sasl_enable"]; ok {
+	if v, ok := conf["sasl_enabled"]; ok {
 		saslEnable, ok := utils.ParseToBool(v)
 		if !ok {
-			logger.Fatal("kafka input: parse config failed: invalid sasl_enable")
+			// logger.Fatal("kafka input: parse config failed: invalid sasl_enabled")
+			panic("kafka input: parse config failed: invalid sasl_enabled")
 		}
 		clientConfig.Net.SASL.Enable = saslEnable
 		if saslEnable {
 			clientConfig.Net.SASL.User, ok = utils.ParseToStr(conf["sasl_username"])
 			clientConfig.Net.SASL.Password, ok = utils.ParseToStr(conf["sasl_password"])
 			if !ok || clientConfig.Net.SASL.User == "" || clientConfig.Net.SASL.Password == "" {
-				logger.Fatal("kafka input: parse config failed: invalid sasl_username and sasl_password")
+				// logger.Fatal("kafka input: parse config failed: invalid sasl_username and sasl_password")
+				panic("kafka input: parse config failed: invalid sasl_username and sasl_password")
 			}
 			saslMechanism, ok := utils.ParseToStr(conf["sasl_mechanism"])
 			if !ok {
-				logger.Fatal("kafka input: parse config failed: invalid sasl_mechanism")
+				// logger.Fatal("kafka input: parse config failed: invalid sasl_mechanism")
+				panic("kafka input: parse config failed: invalid sasl_mechanism")
 			}
 			clientConfig.Net.SASL.Mechanism = sarama.SASLMechanism(saslMechanism)
+
+			// SCRAM 机制需要提供 SCRAMClientGeneratorFunc，否则 sarama 配置校验会失败
+			switch clientConfig.Net.SASL.Mechanism {
+			case sarama.SASLTypeSCRAMSHA256, sarama.SASLTypeSCRAMSHA512:
+				var hashGen scram.HashGeneratorFcn
+				if clientConfig.Net.SASL.Mechanism == sarama.SASLTypeSCRAMSHA256 {
+					hashGen = scram.SHA256
+				} else {
+					hashGen = scram.SHA512
+				}
+				clientConfig.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient {
+					return &scramClient{hashGen: hashGen}
+				}
+			}
+		}
+	}
+
+	// 配置TLS认证
+	if v, ok := conf["tls_enabled"]; ok {
+		tlsEnable, ok := utils.ParseToBool(v)
+		if !ok {
+			// logger.Fatal("kafka input: parse config failed: invalid tls_enabled")
+			panic("kafka input: parse config failed: invalid tls_enabled")
+		}
+		clientConfig.Net.TLS.Enable = tlsEnable
+		if tlsEnable {
+			// 公有云一般不需要自定义证书，直接空TLS配置即可
+			clientConfig.Net.TLS.Config = &tls.Config{
+				InsecureSkipVerify: true,
+			}
+			// 加载自定义CA证书
+			if caPath, ok := conf["tls_ca"]; ok {
+				caPool, err := utils.LoadCACert(caPath.(string))
+				if err != nil {
+					logger.Fatal("kafka input: load ca cert failed", zap.Error(err))
+				}
+				clientConfig.Net.TLS.Config.RootCAs = caPool
+			}
 		}
 	}
 
 	if v, ok := conf["version"]; ok {
 		version, ok := utils.ParseToStr(v)
 		if !ok {
-			logger.Fatal("kafka input: parse config failed: invalid version")
+			// logger.Fatal("kafka input: parse config failed: invalid version")
+			panic("kafka input: parse config failed: invalid version")
 		}
 		kafkaVersionn, err := sarama.ParseKafkaVersion(version)
 		if err != nil {
@@ -198,20 +267,20 @@ func newKafkaInputConfig(conf map[any]any) *KafkaInputConfig {
 	if v, ok := conf["client_id"]; ok {
 		clientConfig.ClientID, ok = utils.ParseToStr(v)
 		if !ok {
-			logger.Fatal("kafka input: parse config failed: invalid client_id")
+			// logger.Fatal("kafka input: parse config failed: invalid client_id")
+			panic("kafka input: parse config failed: invalid client_id")
 		}
 	}
 
 	// 消费者超时设置
-	// clientConfig.Consumer.Group.Session.Timeout = 30 * time.Second
-	// clientConfig.Consumer.Group.Heartbeat.Interval = 10 * time.Second
+	clientConfig.Consumer.Group.Session.Timeout = 30 * time.Second
+	clientConfig.Consumer.Group.Heartbeat.Interval = 10 * time.Second
 
 	if err := clientConfig.Validate(); err != nil {
 		logger.Fatal("kafka input: config validate failed", zap.Error(err))
 	}
 
-	c.clientConfig = clientConfig
-	return c
+	return clientConfig
 }
 
 func newKafkaInput(conf map[any]any) model.Input {
@@ -237,6 +306,8 @@ func newKafkaInput(conf map[any]any) model.Input {
 			logger.Fatal("kafka input: create consumer group failed", zap.Error(err))
 		}
 		kafkaInput.groupConsumers[i] = &client
+		logger.Info("kafka input: create consumer group success", zap.String("groupID", config.groupID))
+
 		go func() {
 			for err := range client.Errors() {
 				logger.Error("kafka input: client err:" + err.Error())
@@ -365,6 +436,31 @@ func (k *KafkaInput) ConsumeClaim(session sarama.ConsumerGroupSession, claim sar
 		// session.MarkMessage(msg, "")
 	}
 	return nil
+}
+
+// scramClient 适配 github.com/xdg-go/scram 到 sarama.SCRAMClient 接口
+type scramClient struct {
+	hashGen scram.HashGeneratorFcn
+	client  *scram.Client
+	conv    *scram.ClientConversation
+}
+
+func (s *scramClient) Begin(userName, password, authzID string) error {
+	var err error
+	s.client, err = s.hashGen.NewClient(userName, password, authzID)
+	if err != nil {
+		return err
+	}
+	s.conv = s.client.NewConversation()
+	return nil
+}
+
+func (s *scramClient) Step(challenge string) (string, error) {
+	return s.conv.Step(challenge)
+}
+
+func (s *scramClient) Done() bool {
+	return s.conv.Done()
 }
 
 func init() {

@@ -25,7 +25,6 @@ func init() {
 }
 
 type ElasticsearchOutput struct {
-	// config        map[any]any
 	index         string
 	indexFG       field_getter.FieldGetter
 	hosts         []string
@@ -50,7 +49,6 @@ func newElasticsearchConfig(conf map[any]any) (*ElasticsearchOutput, elasticsear
 		logger.Fatal("elasticsearch output: config is nil")
 	}
 	e := &ElasticsearchOutput{
-		// config:     conf,
 		ssl:        false,
 		version:    7,
 		sniff:      false,

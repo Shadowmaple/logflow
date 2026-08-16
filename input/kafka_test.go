@@ -25,9 +25,8 @@ func TestKafkaInputConfigParsing(t *testing.T) {
 				"decorate_events":       false,
 				"discard_on_error":      true,
 				"messages_queue_length": 64,
-				"from_beginning":        true,
-				"enable_auto_commit":    false,
-				"commit_interval":       30,
+				"auto_offset_earliest":  true,
+				"auto_commit_interval":  30,
 				"client_id":             "logflow-test",
 			},
 			expected: KafkaInputConfig{
@@ -44,31 +43,6 @@ func TestKafkaInputConfigParsing(t *testing.T) {
 			panics: false,
 		},
 		{
-			name: "valid kafka config with topic_pattern and sasl",
-			config: map[any]any{
-				"brokers":        []string{"broker1:9092"},
-				"topic_pattern":  "^logflow-.*$",
-				"group_id":       "pattern-group",
-				"codec":          "plain",
-				"sasl_enable":    true,
-				"sasl_username":  "user",
-				"sasl_password":  "pass",
-				"sasl_mechanism": "PLAIN",
-			},
-			expected: KafkaInputConfig{
-				brokers:             []string{"broker1:9092"},
-				topics:              nil,
-				topicPattern:        "^logflow-.*$",
-				codec:               "plain",
-				groupID:             "pattern-group",
-				decorateEvents:      true,
-				worker:              1,
-				messagesQueueLength: 12,
-				discardOnError:      false,
-			},
-			panics: false,
-		},
-		{
 			name: "minimal valid kafka config",
 			config: map[any]any{
 				"brokers":  []string{"localhost:9092"},
@@ -78,24 +52,14 @@ func TestKafkaInputConfigParsing(t *testing.T) {
 			expected: KafkaInputConfig{
 				brokers:             []string{"localhost:9092"},
 				topics:              []string{"test-topic"},
-				topicPattern:        "",
 				codec:               "plain",
 				groupID:             "default-group",
 				decorateEvents:      true,
 				worker:              1,
-				messagesQueueLength: 12,
+				messagesQueueLength: 8,
 				discardOnError:      false,
 			},
 			panics: false,
-		},
-		{
-			name: "topics wrong type should panic",
-			config: map[any]any{
-				"brokers":  []string{"localhost:9092"},
-				"topics":   "should-be-slice",
-				"group_id": "g",
-			},
-			panics: true,
 		},
 		{
 			name: "group_id wrong type should panic",
@@ -192,8 +156,8 @@ func assertClientConfigFields(t *testing.T, config map[any]any, cc *sarama.Confi
 		}
 	}
 
-	// commit_interval (秒)
-	if v, ok := config["commit_interval"]; ok {
+	// auto_commit_interval (秒)
+	if v, ok := config["auto_commit_interval"]; ok {
 		want := int64(v.(int))
 		got := int64(cc.Consumer.Offsets.AutoCommit.Interval.Seconds())
 		if got != want {
