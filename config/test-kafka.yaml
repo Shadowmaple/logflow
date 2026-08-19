@@ -1,32 +1,34 @@
-# 遇到错误是否丢弃消息
-# global:
-#   discard_on_error: true
 system:
   worker: 1
   logger:
     level: 'debug'
+    format: 'json'
+    output: 'stdout'
 
 input:
   - kafka:
-      brokers: []
-      version: '2.8.2'
-      topics: ['logflow']
-      group_id: logflow-group
+      brokers: ['kafka-log-project-0406.g.aivencloud.com:18606']
+      version: '4.2.1'
+      topics: ['logistics_data_gen']
+      group_id: logflow-group3
       worker: 1
-      auto_offset_earliest: false
+      auto_offset_earliest: true
       auto_commit_interval: 30 # 单位：秒
       decorate_events: true
       codec: 'json'
       messages_queue_length: 8
       client_id: logflow-client
-      sasl_enable: true
-      sasl_mechanism: SCRAM-SHA-256
+      discard_on_error: false
+      sasl_enabled: true
+      sasl_mechanism: SCRAM-SHA-512
       sasl_username: ''
       sasl_password: ''
-      tls_enabled: false
-      discard_on_error: false # 遇到错误是否丢弃消息
+      tls_enabled: true
+      tls_ca: 'ca.pem'
 
 filter:
+  - json:
+      source: time_utc
   - filters:
       if: ['Exist(level)']
       modules:
@@ -38,8 +40,8 @@ filter:
             if: ['EQ(level, "DEBUG")']
   - date:
       location: 'Asia/Shanghai'
-      source: datatime
-      formats: ['yyyy-MM-dd HH:mm:ss.SSS']
+      source: time_utc
+      formats: ['yyyy-MM-dd HH:mm:ss.SSS', 'UNIX', 'UNIX_MS']
       target: datatime
   - dateFormat:
       source: datatime
@@ -52,13 +54,5 @@ filter:
       fields: ['[@metadata][kafka][topic]']
 
 output:
-  - elasticsearch:
-      hosts: []
-      index: 'kafka-%{[@metadata][kafka][topic]}-%{@localtime}'
-      user: elastic
-      password: test
-      ssl: true
-      cacert: ''
-      sniff: false
-      sniff_interval: 30 # 秒
-      version: 7
+  - console:
+      codec: 'json'
