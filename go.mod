@@ -7,6 +7,7 @@ require (
 	github.com/elastic/go-elasticsearch/v7 v7.17.10
 	github.com/oliveagle/jsonpath v0.1.4
 	github.com/relvacode/iso8601 v1.8.0
+	github.com/xdg-go/scram v1.2.0
 	go.uber.org/zap v1.27.0
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -28,7 +29,6 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	github.com/rogpeppe/go-internal v1.6.1 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
-	github.com/xdg-go/scram v1.2.0 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.42.0 // indirect
