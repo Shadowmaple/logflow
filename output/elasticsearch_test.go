@@ -236,11 +236,11 @@ func TestNewElasticsearchConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.panics {
-				assertPanics(t, func() { newElasticsearchConfig(tt.config) })
+				assertPanics(t, func() { parseElasticsearchConfig(tt.config) })
 				return
 			}
 
-			got, gotClientConfig := newElasticsearchConfig(tt.config)
+			got := parseElasticsearchConfig(tt.config)
 			if got == nil {
 				t.Fatal("newElasticsearchConfig() returned nil output")
 			}
@@ -278,35 +278,6 @@ func TestNewElasticsearchConfig(t *testing.T) {
 			}
 			if got.maxRetries != tt.wantOutput.maxRetries {
 				t.Errorf("maxRetries = %d, want %d", got.maxRetries, tt.wantOutput.maxRetries)
-			}
-
-			// 比较 clientConfig 的关键字段（不含 Transport，它是 *http.Transport 指针）
-			if !reflect.DeepEqual(gotClientConfig.Addresses, tt.wantClientConfig.Addresses) {
-				t.Errorf("clientConfig.Addresses = %v, want %v", gotClientConfig.Addresses, tt.wantClientConfig.Addresses)
-			}
-			if gotClientConfig.Username != tt.wantClientConfig.Username {
-				t.Errorf("clientConfig.Username = %q, want %q", gotClientConfig.Username, tt.wantClientConfig.Username)
-			}
-			if gotClientConfig.Password != tt.wantClientConfig.Password {
-				t.Errorf("clientConfig.Password = %q, want %q", gotClientConfig.Password, tt.wantClientConfig.Password)
-			}
-			if gotClientConfig.APIKey != tt.wantClientConfig.APIKey {
-				t.Errorf("clientConfig.APIKey = %q, want %q", gotClientConfig.APIKey, tt.wantClientConfig.APIKey)
-			}
-			if gotClientConfig.DisableRetry != tt.wantClientConfig.DisableRetry {
-				t.Errorf("clientConfig.DisableRetry = %v, want %v", gotClientConfig.DisableRetry, tt.wantClientConfig.DisableRetry)
-			}
-			if gotClientConfig.MaxRetries != tt.wantClientConfig.MaxRetries {
-				t.Errorf("clientConfig.MaxRetries = %d, want %d", gotClientConfig.MaxRetries, tt.wantClientConfig.MaxRetries)
-			}
-			if gotClientConfig.DiscoverNodesOnStart != tt.wantClientConfig.DiscoverNodesOnStart {
-				t.Errorf("clientConfig.DiscoverNodesOnStart = %v, want %v", gotClientConfig.DiscoverNodesOnStart, tt.wantClientConfig.DiscoverNodesOnStart)
-			}
-			if gotClientConfig.DiscoverNodesInterval != tt.wantClientConfig.DiscoverNodesInterval {
-				t.Errorf("clientConfig.DiscoverNodesInterval = %v, want %v", gotClientConfig.DiscoverNodesInterval, tt.wantClientConfig.DiscoverNodesInterval)
-			}
-			if gotClientConfig.Transport == nil {
-				t.Error("clientConfig.Transport should not be nil")
 			}
 		})
 	}

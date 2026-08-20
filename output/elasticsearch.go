@@ -2,11 +2,11 @@ package output
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -32,7 +32,8 @@ type ElasticsearchOutput struct {
 	password      string
 	apiKey        string // Base64 编码的 API Key 字符串（由 id:api_key 组成后 Base64），优先级高于 user/password
 	ssl           bool
-	cacert        string
+	cacert        string // CA 证书路径
+	skipSSLVerify bool   // 是否跳过 SSL 验证，默认 false，生产环境不建议使用
 	version       int8
 	sniff         bool
 	sniffInterval int
@@ -44,7 +45,7 @@ type ElasticsearchOutput struct {
 
 // newElasticsearchConfig 解析配置，返回 ElasticsearchOutput（不含 client）和 elasticsearch.Config。
 // 不涉及文件 IO 和网络连接，可在单元测试中直接调用。
-func newElasticsearchConfig(conf map[any]any) (*ElasticsearchOutput, elasticsearch.Config) {
+func parseElasticsearchConfig(conf map[any]any) *ElasticsearchOutput {
 	if conf == nil {
 		logger.Fatal("elasticsearch output: config is nil")
 	}
@@ -93,11 +94,18 @@ func newElasticsearchConfig(conf map[any]any) (*ElasticsearchOutput, elasticsear
 		}
 	}
 	if e.ssl {
+		if v, ok := conf["skip_ssl_verify"]; ok {
+			e.skipSSLVerify, ok = utils.ParseToBool(v)
+			if !ok {
+				logger.Fatal("elasticsearch output: skip_ssl_verify config must be a boolean value")
+			}
+		}
 		if v, ok := conf["cacert"]; ok {
 			if e.cacert, ok = utils.ParseToStr(v); !ok {
 				logger.Fatal("elasticsearch output: cacert config must be a string")
 			}
-		} else {
+		}
+		if !e.skipSSLVerify && e.cacert == "" {
 			logger.Fatal("elasticsearch output: cacert config is required")
 		}
 	}
@@ -126,6 +134,31 @@ func newElasticsearchConfig(conf map[any]any) (*ElasticsearchOutput, elasticsear
 		}
 	}
 
+	return e
+}
+
+func newElasticsearchOutput(config map[any]any) model.Output {
+	// 解析配置并创建 ElasticsearchOutput 实例
+	e := parseElasticsearchConfig(config)
+
+	transport := &http.Transport{
+		ResponseHeaderTimeout: 10 * time.Second,
+		DialContext: (&net.Dialer{
+			Timeout: 5 * time.Second,
+		}).DialContext,
+	}
+	if e.ssl {
+		if e.skipSSLVerify {
+			transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		} else {
+			caPool, err := utils.LoadCACert(e.cacert)
+			if err != nil {
+				logger.Fatal("elasticsearch output: load ca cert failed", zap.Error(err))
+			}
+			transport.TLSClientConfig = &tls.Config{RootCAs: caPool}
+		}
+	}
+
 	clientConfig := elasticsearch.Config{
 		Addresses:            e.hosts,
 		Username:             e.user,
@@ -134,32 +167,14 @@ func newElasticsearchConfig(conf map[any]any) (*ElasticsearchOutput, elasticsear
 		DisableRetry:         e.maxRetries == 0,
 		MaxRetries:           e.maxRetries,
 		DiscoverNodesOnStart: e.sniff,
-		Transport: &http.Transport{
-			ResponseHeaderTimeout: 10 * time.Second,
-			DialContext: (&net.Dialer{
-				Timeout: 5 * time.Second,
-			}).DialContext,
-		},
+		Transport:            transport,
 	}
 
 	if e.sniff {
 		clientConfig.DiscoverNodesInterval = time.Duration(e.sniffInterval) * time.Second
 	}
 
-	return e, clientConfig
-}
-
-func newElasticsearchOutput(config map[any]any) model.Output {
-	e, clientConfig := newElasticsearchConfig(config)
-
 	var err error
-	if e.ssl {
-		// 根据路径加载证书文件
-		if clientConfig.CACert, err = os.ReadFile(e.cacert); err != nil {
-			logger.Fatal("elasticsearch output: Failed to read Elasticsearch CACert file:"+e.cacert, zap.Error(err))
-		}
-	}
-
 	e.client, err = elasticsearch.NewClient(clientConfig)
 	if err != nil {
 		logger.Fatal("elasticsearch output: Failed to create Elasticsearch client", zap.Error(err))
