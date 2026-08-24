@@ -2,6 +2,21 @@
 
 数据消费管道
 
+## Build
+
+### Run
+
+```
+make
+logflow -c config/logflow.yaml
+```
+
+### Docker
+
+```Shell
+docker build -t logflow:v1 .
+```
+
 ## 字段约定
 
 ### JSONPATH 格式
@@ -233,6 +248,25 @@ strip: ["name"]
 
 #### elasticsearch
 
+```YAML
+elasticsearch:
+  hosts: ['https://127.0.0.1:6009']
+  index: 'kafka-%{[@metadata][kafka][topic]}-%{@localtime}'
+  user: elastic
+  password: test
+  ssl: true
+  cacert: ''
+  sniff: false
+  sniff_interval: 30 # 秒
+  version: 7
+  skip_ssl_verification: false # 是否跳过 ES 的证书校验
+  bulk_count: 5000
+  bulk_size: 15
+  flush_interval: 30
+```
+
 #### file
+
+todo
 
 #### console
