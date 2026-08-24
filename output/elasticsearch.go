@@ -37,10 +37,18 @@ type ElasticsearchOutput struct {
 	version       int8
 	sniff         bool
 	sniffInterval int
-	maxRetries    int // 最大重试次数，默认 3 次
+	maxRetries    int           // 最大重试次数，默认 3 次
+	bulkCount     int           // 触发批量提交的消息条数，默认 5000
+	bulkSize      int           // 触发批量提交的字节阈值，默认 15MB
+	flushInterval time.Duration // 定时提交间隔，默认 30s，避免数据量过少时长时间不提交
 
-	client  *elasticsearch.Client
-	bufPool sync.Pool
+	client    *elasticsearch.Client
+	bulkMu    sync.Mutex // 保护 bulkBuf/bulkCur 在 Handle、定时 flush goroutine 与 Close 间的并发访问
+	bulkBuf   *bytes.Buffer
+	bulkCur   int
+	metaCache map[string][]byte // index -> action 行字节缓存，避免重复 marshal
+	flushStop chan struct{}     // 通知定时 flush goroutine 退出
+	flusherWg sync.WaitGroup    // 等待定时 flush goroutine 结束
 }
 
 // newElasticsearchConfig 解析配置，返回 ElasticsearchOutput（不含 client）和 elasticsearch.Config。
@@ -50,15 +58,15 @@ func parseElasticsearchConfig(conf map[any]any) *ElasticsearchOutput {
 		logger.Fatal("elasticsearch output: config is nil")
 	}
 	e := &ElasticsearchOutput{
-		ssl:        false,
-		version:    7,
-		sniff:      false,
-		maxRetries: 3,
-		bufPool: sync.Pool{
-			New: func() any {
-				return new(bytes.Buffer)
-			},
-		},
+		ssl:           false,
+		version:       7,
+		sniff:         false,
+		maxRetries:    3,
+		bulkCount:     5000,
+		bulkSize:      15 * 1024 * 1024, // 15MB
+		flushInterval: 30 * time.Second,
+		bulkBuf:       new(bytes.Buffer),
+		metaCache:     make(map[string][]byte),
 	}
 	if v, ok := conf["index"]; ok {
 		if e.index, ok = utils.ParseToStr(v); !ok {
@@ -94,10 +102,10 @@ func parseElasticsearchConfig(conf map[any]any) *ElasticsearchOutput {
 		}
 	}
 	if e.ssl {
-		if v, ok := conf["skip_ssl_verify"]; ok {
+		if v, ok := conf["skip_ssl_verification"]; ok {
 			e.skipSSLVerify, ok = utils.ParseToBool(v)
 			if !ok {
-				logger.Fatal("elasticsearch output: skip_ssl_verify config must be a boolean value")
+				logger.Fatal("elasticsearch output: skip_ssl_verification config must be a boolean value")
 			}
 		}
 		if v, ok := conf["cacert"]; ok {
@@ -132,6 +140,27 @@ func parseElasticsearchConfig(conf map[any]any) *ElasticsearchOutput {
 		if e.maxRetries, ok = utils.ParseToInt(v); !ok || e.maxRetries < 0 {
 			logger.Fatal("elasticsearch output: max_retries config must be greater than or equal to 0")
 		}
+	}
+	// 批量提交触发条件：bulk_count 条消息 或 bulk_size MB 数据，任一满足即提交
+	if v, ok := conf["bulk_count"]; ok {
+		if e.bulkCount, ok = utils.ParseToInt(v); !ok || e.bulkCount <= 0 {
+			logger.Fatal("elasticsearch output: bulk_count must be a positive integer")
+		}
+	}
+	if v, ok := conf["bulk_size"]; ok {
+		bulkSizeMB, ok := utils.ParseToInt(v)
+		if !ok || bulkSizeMB <= 0 {
+			logger.Fatal("elasticsearch output: bulk_size must be a positive integer (MB)")
+		}
+		e.bulkSize = bulkSizeMB * 1024 * 1024
+	}
+	// 定时提交间隔（秒）：即使未达到 bulk_count/bulk_size，也每隔该时间提交一次缓冲区
+	if v, ok := conf["flush_interval"]; ok {
+		fi, ok := utils.ParseToInt(v)
+		if !ok || fi <= 0 {
+			logger.Fatal("elasticsearch output: flush_interval must be a positive integer (seconds)")
+		}
+		e.flushInterval = time.Duration(fi) * time.Second
 	}
 
 	return e
@@ -191,9 +220,15 @@ func newElasticsearchOutput(config map[any]any) model.Output {
 	}
 	logger.Info("elasticsearch output: Connected to Elasticsearch", zap.String("body", res.String()))
 
+	// 启动定时 flush goroutine，按 flush_interval 周期性提交缓冲区
+	e.flushStop = make(chan struct{})
+	e.flusherWg.Add(1)
+	go e.runFlusher()
+
 	return e
 }
 
+// Handle 将事件追加到批量缓冲区，当条数（bulkCount）或字节数（bulkSize）达到阈值时触发批量提交。
 func (e *ElasticsearchOutput) Handle(event *event.Event) error {
 	// 根据index格式和消息，生成需写入的index，获取失败则默认为字面量
 	var index = e.index
@@ -204,34 +239,130 @@ func (e *ElasticsearchOutput) Handle(event *event.Event) error {
 		index = indexStr
 	}
 
-	// 将 map 序列化为 JSON（复用 sync.Pool 中的 bytes.Buffer）
-	buf := e.bufPool.Get().(*bytes.Buffer)
-	buf.Reset()
-	defer e.bufPool.Put(buf)
+	e.bulkMu.Lock()
+	defer e.bulkMu.Unlock()
 
-	if err = json.NewEncoder(buf).Encode(event.Data); err != nil {
+	// 写入 action 行：{"index":{"_index":"<index>"}}
+	meta, err := e.metaLine(index)
+	if err != nil {
+		logger.Error("elasticsearch output: marshal bulk meta failed", zap.Error(err))
+		return err
+	}
+	metaStart := e.bulkBuf.Len()
+	e.bulkBuf.Write(meta)
+
+	// 写入文档行。json.Encoder.Encode 先在内部完成序列化，成功后才写入底层 writer，
+	// 失败时 bulkBuf 不会被改动（仅残留上面的 action 行，需回滚）。
+	if err = json.NewEncoder(e.bulkBuf).Encode(event.Data); err != nil {
+		e.bulkBuf.Truncate(metaStart)
 		logger.Error("elasticsearch output: Failed to encode event data to JSON", zap.Error(err))
 		return err
 	}
 
-	// TODO: 写入失败后将数据存入失败队列，不断重试。（待定：持久化到磁盘，避免重启导致数据丢失）
-	// 写入事件到 Elasticsearch
-	res, err := e.client.Index(index, buf)
+	e.bulkCur++
+	// 达到任一阈值即提交
+	if e.bulkCur >= e.bulkCount || e.bulkBuf.Len() >= e.bulkSize {
+		return e.flush()
+	}
+	return nil
+}
+
+// flush 提交当前缓冲区中的批量请求。调用方必须持有 e.bulkMu。
+func (e *ElasticsearchOutput) flush() error {
+	if e.bulkCur == 0 {
+		return nil
+	}
+	res, err := e.client.Bulk(bytes.NewReader(e.bulkBuf.Bytes()))
 	if err != nil {
-		logger.Error("elasticsearch output: Failed to index event to Elasticsearch", zap.Error(err))
+		count := e.bulkCur
+		e.resetBulk()
+		// TODO: 写入失败后将数据存入失败队列，不断重试。（待定：持久化到磁盘，避免重启导致数据丢失）
+		logger.Error("elasticsearch output: bulk index request failed",
+			zap.Error(err), zap.Int("dropped", count))
 		return err
 	}
 	defer res.Body.Close()
 	if res.IsError() {
-		logger.Error("elasticsearch output: Failed to index event to Elasticsearch",
-			zap.String("resp", res.String()))
-		return fmt.Errorf("elasticsearch index failed: %s", res.Status())
+		count := e.bulkCur
+		status := res.Status()
+		logger.Error("elasticsearch output: bulk index request failed",
+			zap.Int("dropped", count), zap.String("status", status), zap.String("resp", res.String()))
+		e.resetBulk()
+		return fmt.Errorf("elasticsearch bulk index failed: %s", status)
 	}
-	logger.Debug("elasticsearch output: Indexed event to Elasticsearch", zap.String("resp", res.String()))
+	// 批量响应体中可能存在单项失败（HTTP 200 但 errors=true），检查并记录
+	var result struct {
+		Errors bool `json:"errors"`
+		Took   int  `json:"took"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		logger.Error("elasticsearch output: decode bulk response failed", zap.Error(err))
+	} else if result.Errors {
+		logger.Error("elasticsearch output: bulk request had item-level errors",
+			zap.Int("count", e.bulkCur), zap.Int("took", result.Took))
+	}
+	logger.Debug("elasticsearch output: bulk indexed ok",
+		zap.Int("count", e.bulkCur), zap.Int("bytes", e.bulkBuf.Len()))
+	e.resetBulk()
 	return nil
 }
 
+// resetBulk 清空批量缓冲区。调用方必须持有 e.bulkMu。
+func (e *ElasticsearchOutput) resetBulk() {
+	e.bulkBuf.Reset()
+	e.bulkCur = 0
+}
+
+// metaLine 返回指定 index 对应的 bulk action 行（含换行）。
+// 结果按 index 缓存，避免每条消息都重新 marshal。调用方必须持有 e.bulkMu。
+func (e *ElasticsearchOutput) metaLine(index string) ([]byte, error) {
+	if line, ok := e.metaCache[index]; ok {
+		return line, nil
+	}
+	meta := map[string]map[string]string{"index": {"_index": index}}
+	line, err := json.Marshal(meta)
+	if err != nil {
+		return nil, err
+	}
+	line = append(line, '\n')
+	e.metaCache[index] = line
+	return line, nil
+}
+
+// runFlusher 按固定间隔触发批量提交，避免数据量过少时长时间停留在缓冲区。
+func (e *ElasticsearchOutput) runFlusher() {
+	defer e.flusherWg.Done()
+	ticker := time.NewTicker(e.flushInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-e.flushStop:
+			return
+		case <-ticker.C:
+			e.bulkMu.Lock()
+			if e.bulkCur > 0 {
+				if err := e.flush(); err != nil {
+					logger.Error("elasticsearch output: timed flush failed", zap.Error(err))
+				}
+			}
+			e.bulkMu.Unlock()
+		}
+	}
+}
+
 func (e *ElasticsearchOutput) Close() {
-	// 客户端不是长连接，不需要关闭
+	// 先停止定时 flush goroutine，避免与最终的 flush 竞争
+	if e.flushStop != nil {
+		close(e.flushStop)
+		e.flusherWg.Wait()
+	}
+	// 关闭前刷新剩余的缓冲事件，避免数据丢失
+	e.bulkMu.Lock()
+	if e.bulkCur > 0 {
+		if err := e.flush(); err != nil {
+			logger.Error("elasticsearch output: flush on close failed", zap.Error(err))
+		}
+	}
+	e.bulkMu.Unlock()
 	logger.Info("elasticsearch output Close ok")
 }
