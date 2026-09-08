@@ -8,7 +8,7 @@ import (
 
 func TestStrip(t *testing.T) {
 	conf := map[any]any{
-		"fields": []string{"level"},
+		"fields": []any{"level"},
 	}
 	f := newStripFilter(conf)
 	if f == nil {

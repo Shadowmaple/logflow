@@ -24,9 +24,9 @@ func TestJsonFilter_WithTarget(t *testing.T) {
 	if _, ok := ev.Data["raw"].([]byte); !ok {
 		t.Fatalf("raw should remain []byte, got %T", ev.Data["raw"])
 	}
-	got, ok := ev.Data["parsed"].(map[any]any)
+	got, ok := ev.Data["parsed"].(map[string]any)
 	if !ok {
-		t.Fatalf("parsed should be map[any]any, got %T", ev.Data["parsed"])
+		t.Fatalf("parsed should be map[string]any, got %T", ev.Data["parsed"])
 	}
 	if got["message"] != "hello" {
 		t.Fatalf("message = %v, want %q", got["message"], "hello")
@@ -95,9 +95,9 @@ func TestJsonFilter_EmptyJsonObject(t *testing.T) {
 	if _, err := f.Filter(ev); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	got, ok := ev.Data["parsed"].(map[any]any)
+	got, ok := ev.Data["parsed"].(map[string]any)
 	if !ok {
-		t.Fatalf("parsed should be map[any]any, got %T", ev.Data["parsed"])
+		t.Fatalf("parsed should be map[string]any, got %T", ev.Data["parsed"])
 	}
 	if len(got) != 0 {
 		t.Fatalf("parsed should be empty map, got %v", got)
@@ -124,24 +124,27 @@ func TestJsonFilter_SourceNotFound(t *testing.T) {
 	}
 }
 
-func TestJsonFilter_SourceNotBytes(t *testing.T) {
-	// source 存在但类型不是 []byte（如 string）应返回错误
+func TestJsonFilter_StringSource(t *testing.T) {
+	// string 类型的 source 会被 ParseToBytes 自动转为 []byte，应正常解析
 	f := newJsonFilter(map[any]any{
 		"source": "raw",
 		"target": "parsed",
 	})
 	ev := &event.Event{Data: map[string]any{"raw": `{"message":"hello"}`}}
 
-	_, err := f.Filter(ev)
-	if err == nil {
-		t.Fatal("expected error for non-[]byte source, got nil")
-	}
-	if err.Error() != "invalid source" {
-		t.Fatalf("error = %q, want %q", err.Error(), "invalid source")
+	if _, err := f.Filter(ev); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 	// 原 string 值保持不变
 	if got := ev.Data["raw"]; got != `{"message":"hello"}` {
 		t.Fatalf("raw = %v, want original string", got)
+	}
+	got, ok := ev.Data["parsed"].(map[string]any)
+	if !ok {
+		t.Fatalf("parsed should be map[string]any, got %T", ev.Data["parsed"])
+	}
+	if got["message"] != "hello" {
+		t.Fatalf("message = %v, want %q", got["message"], "hello")
 	}
 }
 
@@ -212,7 +215,7 @@ func TestJsonFilter_EmptyTarget_EqualsMergedMap(t *testing.T) {
 	if _, err := f.Filter(ev); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	want := map[any]any{
+	want := map[string]any{
 		"raw": []byte(`{"a":1,"b":2}`),
 		"a":   float64(1),
 		"b":   float64(2),
@@ -294,9 +297,9 @@ func TestBuildFilter_Json(t *testing.T) {
 	if _, err := f.Filter(ev); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	got, ok := ev.Data["parsed"].(map[any]any)
+	got, ok := ev.Data["parsed"].(map[string]any)
 	if !ok {
-		t.Fatalf("parsed should be map[any]any, got %T", ev.Data["parsed"])
+		t.Fatalf("parsed should be map[string]any, got %T", ev.Data["parsed"])
 	}
 	if got["message"] != "BuildFilter TEST" {
 		t.Fatalf("message = %v, want %q", got["message"], "BuildFilter TEST")

@@ -8,7 +8,7 @@ import (
 
 func TestLowercaseFilter_SingleField(t *testing.T) {
 	f := newLowercaseFilter(map[any]any{
-		"fields": []string{"message"},
+		"fields": []any{"message"},
 	})
 	ev := &event.Event{Data: map[string]any{"message": "Hello WORLD 123"}}
 
@@ -22,7 +22,7 @@ func TestLowercaseFilter_SingleField(t *testing.T) {
 
 func TestLowercaseFilter_MultipleFields(t *testing.T) {
 	f := newLowercaseFilter(map[any]any{
-		"fields": []string{"message", "host"},
+		"fields": []any{"message", "host"},
 	})
 	ev := &event.Event{Data: map[string]any{
 		"message": "Hello",
@@ -42,7 +42,7 @@ func TestLowercaseFilter_MultipleFields(t *testing.T) {
 
 func TestLowercaseFilter_AlreadyLowercase(t *testing.T) {
 	f := newLowercaseFilter(map[any]any{
-		"fields": []string{"message"},
+		"fields": []any{"message"},
 	})
 	ev := &event.Event{Data: map[string]any{"message": "already lower"}}
 
@@ -57,7 +57,7 @@ func TestLowercaseFilter_AlreadyLowercase(t *testing.T) {
 func TestLowercaseFilter_BracketSingleLevel(t *testing.T) {
 	// "[message]" 等价于单层级字段 message
 	f := newLowercaseFilter(map[any]any{
-		"fields": []string{"[message]"},
+		"fields": []any{"[message]"},
 	})
 	ev := &event.Event{Data: map[string]any{"message": "HELLO"}}
 
@@ -71,7 +71,7 @@ func TestLowercaseFilter_BracketSingleLevel(t *testing.T) {
 
 func TestLowercaseFilter_EmptyFields(t *testing.T) {
 	f := newLowercaseFilter(map[any]any{
-		"fields": []string{},
+		"fields": []any{},
 	})
 	ev := &event.Event{Data: map[string]any{"message": "HELLO"}}
 
@@ -86,17 +86,14 @@ func TestLowercaseFilter_EmptyFields(t *testing.T) {
 }
 
 func TestLowercaseFilter_FieldNotFound(t *testing.T) {
+	// 字段不存在时跳过，不做任何操作，也不返回错误
 	f := newLowercaseFilter(map[any]any{
-		"fields": []string{"missing"},
+		"fields": []any{"missing"},
 	})
 	ev := &event.Event{Data: map[string]any{"message": "HELLO"}}
 
-	_, err := f.Filter(ev)
-	if err == nil {
-		t.Fatal("expected error for missing field, got nil")
-	}
-	if err.Error() != "lowercase filter failed" {
-		t.Fatalf("error = %q, want %q", err.Error(), "lowercase filter failed")
+	if _, err := f.Filter(ev); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 	// 不存在的字段不应被写入
 	if _, ok := ev.Data["missing"]; ok {
@@ -106,7 +103,7 @@ func TestLowercaseFilter_FieldNotFound(t *testing.T) {
 
 func TestLowercaseFilter_NonStringValue(t *testing.T) {
 	f := newLowercaseFilter(map[any]any{
-		"fields": []string{"count"},
+		"fields": []any{"count"},
 	})
 	ev := &event.Event{Data: map[string]any{"count": 123}}
 
@@ -124,13 +121,13 @@ func TestLowercaseFilter_MixedSuccessAndFailure(t *testing.T) {
 	// 部分字段处理成功、部分失败时，成功的字段仍应被转换，
 	// 同时整体返回错误
 	f := newLowercaseFilter(map[any]any{
-		"fields": []string{"message", "missing"},
+		"fields": []any{"message", "count"},
 	})
-	ev := &event.Event{Data: map[string]any{"message": "HELLO"}}
+	ev := &event.Event{Data: map[string]any{"message": "HELLO", "count": 123}}
 
 	_, err := f.Filter(ev)
 	if err == nil {
-		t.Fatal("expected error due to missing field, got nil")
+		t.Fatal("expected error due to non-string field, got nil")
 	}
 	if got := ev.Data["message"]; got != "hello" {
 		t.Fatalf("message = %v, want %q (should still be lowercased)", got, "hello")
@@ -152,9 +149,9 @@ func TestNewLowercaseFilter_PanicsOnWrongType(t *testing.T) {
 			t.Fatal("expected panic when fields is wrong type, got none")
 		}
 	}()
-	// []any 不满足 []string 断言
+	// []string 不满足 []any 断言
 	newLowercaseFilter(map[any]any{
-		"fields": []any{"message"},
+		"fields": []string{"message"},
 	})
 }
 
@@ -171,7 +168,7 @@ func TestBuildFilter_Lowercase(t *testing.T) {
 	// 通过注册名 "lowercase" 构建 filter
 	conf := map[any]any{
 		"lowercase": map[any]any{
-			"fields": []string{"message"},
+			"fields": []any{"message"},
 		},
 	}
 	f := BuildFilter(conf)
