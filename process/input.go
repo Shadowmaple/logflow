@@ -74,7 +74,6 @@ func (h *InputHandler) startOne(id int) {
 
 	logger.Debug("InputHandler startOne gets close signal and quickly receives all events")
 	// 快速将未消费完的事件发送到下一个处理线程
-	// TODO: 如果es集群挂了，链路一直卡住，那就一直无法关闭
 	wg := new(sync.WaitGroup)
 	for {
 		event := h.input.ReceiveOne()
